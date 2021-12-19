@@ -8,8 +8,15 @@ Welcome to your new app.
 
 <SurveyPrompt Title="How is Blazor working for you?" />
 
-<Input type="text" />
 <button @onclick="HandleClick">Start</button>
+
+<div class="row col-md-6" >
+    
+    <input id="textBox" value="@text" placeholder="enter text..."/>
+    
+    
+</div>
+
 <div class="row" >
     <div class="col-md-6">
         <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
@@ -19,12 +26,23 @@ Welcome to your new app.
 
 @code{
     private bool imageHidden = true;
+    private string? text;
     private async Task HandleClick()
     {
+        text = "";
         imageHidden = false;
+        await Wait();
+        
+        text =  "5seconds have passed";
+        @* Console.WriteLine("5seconds have passed"); *@
+
+        imageHidden = true;
+    }
+
+    private async Task Wait()
+    {
         //Thread.Sleep(TimeSpan.FromSeconds(5));
         await Task.Delay(TimeSpan.FromSeconds(5));
-        imageHidden = true;
     }
 
 }
