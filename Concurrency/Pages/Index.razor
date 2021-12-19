@@ -7,3 +7,24 @@
 Welcome to your new app.
 
 <SurveyPrompt Title="How is Blazor working for you?" />
+
+<Input type="text" />
+<button @onclick="HandleClick">Start</button>
+<div class="row" >
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>  
+</div>
+
+
+@code{
+    private bool imageHidden = true;
+    private async Task HandleClick()
+    {
+        imageHidden = false;
+        //Thread.Sleep(TimeSpan.FromSeconds(5));
+        await Task.Delay(TimeSpan.FromSeconds(5));
+        imageHidden = true;
+    }
+
+}
