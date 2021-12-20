@@ -22,7 +22,7 @@
 @code{
     private bool imageHidden = true;
     private string text = "";
-    private string apiURL = "https://localhost:7282/";
+    private string apiURL = "https://localhost:7282";
     public HttpClient httpClient = new ();
     private string? InputValue { get; set; }
 
@@ -40,7 +40,7 @@
 
     private async Task<string> GetGreetings(string name)
         {
-            using var response = await httpClient.GetAsync($"{apiURL}greetings/{name}");
+            using var response = await httpClient.GetAsync($"{apiURL}/greetings/{name}");
             return await response.Content.ReadAsStringAsync();
         }
 

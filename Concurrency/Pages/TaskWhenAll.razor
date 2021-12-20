@@ -1,0 +1,77 @@
+﻿@page "/TaskWhenAll"
+@using Newtonsoft.Json;
+@using System.Text
+@using System.Diagnostics
+@inject IConfiguration Config;
+
+<h1>Tasks When All</h1>
+
+<button @onclick="HandleClick">Start</button>
+
+<div class="row col-md-6" >
+    <p>@text</p>
+</div>
+
+<div class="row" >
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>  
+</div>
+
+
+@code{
+    private bool imageHidden = true;
+    private string text = "";
+    private string apiURL = "";
+    public HttpClient httpClient = new ();
+    
+    private async Task HandleClick()
+    {
+        imageHidden = false;
+
+        var stopWatch = new Stopwatch();
+
+        try
+        {
+            apiURL = Config.GetValue<string>("apiURL");
+            var cards = GetCards(5);
+            stopWatch.Start();
+
+            await ProcessCards(cards);
+        }
+        catch (HttpRequestException ex)
+        {
+            text =  ex.Message;
+        }
+        
+        text = $"Operation done in : {stopWatch.ElapsedMilliseconds/ 1000.0} seconds";
+
+        imageHidden = true;
+    }
+
+    private async Task ProcessCards(List<string> cards)
+    {
+        var tasks = new List<Task<HttpResponseMessage>>();
+            
+        foreach(var card in cards)
+        {
+            var json = JsonConvert.SerializeObject(card);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var responseTask = httpClient.PostAsync($"{apiURL}/cards", content);
+            tasks.Add(responseTask);
+        }
+
+        await Task.WhenAll(tasks);
+    }
+    private List<string> GetCards(int amountofCardsToGenerate)
+    {
+        var cards = new List<string>();
+        for(int i = 1; i <= amountofCardsToGenerate; i++ )
+        {
+            cards.Add(i.ToString().PadLeft(16, '0'));
+        }
+        return cards;
+
+    }
+
+}
