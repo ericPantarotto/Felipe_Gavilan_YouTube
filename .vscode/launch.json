@@ -33,7 +33,7 @@
             "name": ".ConcurrencyApi",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
+            "preLaunchTask": "buildApi",
             // If you have changed target frameworks, make sure to update the program path.
             "program": "${workspaceFolder}/ConcurrencyApi/bin/Debug/net6.0/ConcurrencyApi.dll",
             "args": [],

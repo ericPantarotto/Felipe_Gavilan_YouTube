@@ -39,7 +39,7 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "build",
+            "label": "buildApi",
             "command": "dotnet",
             "type": "process",
             "args": [
@@ -51,7 +51,7 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "publish",
+            "label": "publishApi",
             "command": "dotnet",
             "type": "process",
             "args": [
@@ -63,7 +63,7 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "watch",
+            "label": "watchApi",
             "command": "dotnet",
             "type": "process",
             "args": [
