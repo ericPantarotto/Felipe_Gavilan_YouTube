@@ -1,0 +1,56 @@
+﻿@page "/TryCatch"
+@inject IConfiguration Config;
+
+<h1>Try Catch</h1>
+
+<button @onclick="HandleClick">Start</button>
+<input id="textBox" @bind="InputValue" placeholder="enter text..." type="search"/>
+
+<div class="row col-md-6" >
+    <p>@text</p>
+    
+    
+</div>
+
+<div class="row" >
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>  
+</div>
+
+
+@code{
+    private bool imageHidden = true;
+    private string text = "";
+    //private string apiURL = "https://localhost:7282/";
+    private string apiURL = "";
+    public HttpClient httpClient = new ();
+    private string? InputValue { get; set; }
+    
+    private async Task HandleClick()
+    {
+        imageHidden = false;
+
+        text = "";
+        try
+        {
+            apiURL = Config.GetValue<string>("apiURL");
+            var greeting = await GetGreetings(InputValue ?? string.Empty );
+            text =  greeting;
+        }
+        catch (HttpRequestException ex)
+        {
+            text =  ex.Message;
+        }
+        
+        imageHidden = true;
+    }
+
+    private async Task<string> GetGreetings(string name)
+        {
+            using var response = await httpClient.GetAsync($"{apiURL}greetings/{name}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStringAsync();
+        }
+
+}
