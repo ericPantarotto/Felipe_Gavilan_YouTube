@@ -6,11 +6,11 @@ namespace ConcurrencyApi.Helpers
         private static RNGCryptoServiceProvider _global = new();
         
         [ThreadStatic]
-        private static Random _local;
+        private static Random? _local;
 
         public static double NextDouble()
         {
-            Random inst = _local;
+            Random? inst = _local;
             if (inst is null)
             {
                 byte[] buffer = new byte[4];

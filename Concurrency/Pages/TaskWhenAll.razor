@@ -34,7 +34,7 @@
         try
         {
             apiURL = Config.GetValue<string>("apiURL");
-            var cards = GetCards(5);
+            var cards = GetCards(2000);
             stopWatch.Start();
 
             await ProcessCards(cards);

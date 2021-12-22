@@ -11,7 +11,9 @@ public class CardsController : ControllerBase
     public async Task<ActionResult> ProcessCard([FromBody] string card)
     {
         //new Random(); => this would not work well in a multi-Thread environment 
-        var randomValue = RandomGen.NextDouble();
+        //var randomValue = RandomGen.NextDouble(); => old number generator
+        var randomValue = RandomNumberGen.NextDouble();
+        
         var approved = randomValue > 0.1;
         await Task.Delay(1000);
         Console.WriteLine($"Card {card} processed ({approved})");
