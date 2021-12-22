@@ -8,23 +8,23 @@
 
 <button @onclick="HandleClick">Start</button>
 
-<div class="row col-md-6" >
+<div class="row col-md-6">
     <p>@text</p>
 </div>
 
-<div class="row" >
+<div class="row">
     <div class="col-md-6">
         <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
-    </div>  
+    </div>
 </div>
 
 
-@code{
+@code {
     private bool imageHidden = true;
     private string text = "";
     private string apiURL = "";
-    public HttpClient httpClient = new ();
-    
+    public HttpClient httpClient = new();
+
     private async Task HandleClick()
     {
         imageHidden = false;
@@ -34,17 +34,17 @@
         try
         {
             apiURL = Config.GetValue<string>("apiURL");
-            var cards = GetCards(2000);
+            var cards = await GetCards(2000);
             stopWatch.Start();
 
             await ProcessCards(cards);
         }
         catch (HttpRequestException ex)
         {
-            text =  ex.Message;
+            text = ex.Message;
         }
-        
-        text = $"Operation done in : {stopWatch.ElapsedMilliseconds/ 1000.0} seconds";
+
+        text = $"Operation done in : {stopWatch.ElapsedMilliseconds / 1000.0} seconds";
 
         imageHidden = true;
     }
@@ -52,25 +52,32 @@
     private async Task ProcessCards(List<string> cards)
     {
         var tasks = new List<Task<HttpResponseMessage>>();
-            
-        foreach(var card in cards)
+
+        await Task.Run(() =>
         {
-            var json = JsonConvert.SerializeObject(card);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var responseTask = httpClient.PostAsync($"{apiURL}/cards", content);
-            tasks.Add(responseTask);
-        }
+            foreach (var card in cards)
+            {
+                var json = JsonConvert.SerializeObject(card);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var responseTask = httpClient.PostAsync($"{apiURL}/cards", content);
+                tasks.Add(responseTask);
+            }
+        });
 
         await Task.WhenAll(tasks);
     }
-    private List<string> GetCards(int amountofCardsToGenerate)
+    private async Task<List<string>> GetCards(int amountofCardsToGenerate)
     {
-        var cards = new List<string>();
-        for(int i = 1; i <= amountofCardsToGenerate; i++ )
+        return await Task.Run(() =>
         {
-            cards.Add(i.ToString().PadLeft(16, '0'));
-        }
-        return cards;
+            var cards = new List<string>();
+            for (int i = 1; i <= amountofCardsToGenerate; i++)
+            {
+                cards.Add(i.ToString().PadLeft(16, '0'));
+            }
+            return cards;
+        });
+
 
     }
 
