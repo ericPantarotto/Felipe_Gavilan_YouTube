@@ -1,0 +1,147 @@
+﻿@page "/IProgress"
+@using Newtonsoft.Json;
+@using System.Text
+@using System.Diagnostics
+@inject IConfiguration Config;
+
+<h1>IProgress</h1>
+
+<button @onclick="HandleClick">Start</button>
+
+<div class="row col-md-6">
+    <p>@text</p>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        @* <progress max="100" value="@pgCards"/> *@
+        <div class="progress">
+            <div class="progress-bar h-75" role="progressbar" style="width: @pgCards%" aria-valuenow="@pgCards"
+                aria-valuemin="0" aria-valuemax="100">@pgCards%</div>
+        </div>
+    </div>
+
+</div>
+<div class="col-md-4">
+    cards: @nbCardsProcessed / @NbCardsToProcess
+</div>
+<div class="row">
+
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private string apiURL = "";
+    public HttpClient httpClient = new();
+    private int NbCardsToProcess = 1000;
+    private int SemaphoreSize =215;
+    private int pgCards;
+    private int nbCardsProcessed;
+
+
+
+    private async Task HandleClick()
+    {
+        //NOTE: declaring a progress element that will fire a paricular method in the Process card method
+        var progressReport = new Progress<(int, int)>(ReportCardProcessingProgress);
+        
+        text = "";
+        pgCards = 0;
+        nbCardsProcessed = 0;
+        imageHidden = false;
+
+        var stopWatch = new Stopwatch();
+
+        try
+        {
+            apiURL = Config.GetValue<string>("apiURL");
+            var cards = await GetCards(NbCardsToProcess);
+            stopWatch.Start();
+            //NOTE: passing the progress object as parameter
+            await ProcessCards(cards, progressReport);
+
+            text = $"Operation done in : {stopWatch.ElapsedMilliseconds / 1000.0} seconds";
+        }
+        catch (HttpRequestException ex)
+        {
+            text = ex.Message;
+        }
+        finally
+        {
+            imageHidden = true;
+        }
+    }
+
+    //NOTE: handling the progress
+    private async void ReportCardProcessingProgress((int percentage, int nbTask) reportedValues)
+    {
+        pgCards = reportedValues.percentage;
+        nbCardsProcessed = reportedValues.nbTask;
+        //await InvokeAsync(() => StateHasChanged());
+        await InvokeAsync(() => StateHasChanged());
+    }
+
+    //NOTE: Argument as IProgress
+    private async Task ProcessCards(List<string> cards, IProgress<(int, int)>? progress)
+    {
+        using var semaphore = new SemaphoreSlim(SemaphoreSize);
+
+        var tasks = new List<Task<HttpResponseMessage>>();
+
+        int taskResolved = 0;
+
+        tasks = cards.Select(async card =>
+        {
+            var json = JsonConvert.SerializeObject(card);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            await semaphore.WaitAsync();
+            try
+            {
+                var internalTask = await httpClient.PostAsync($"{apiURL}/cards", content);
+
+                //HANDLE
+                if (progress is not null)
+                {
+                    taskResolved++;
+                    double percentage = (double)taskResolved / cards.Count * 100;
+                    var pecentageInt = Convert.ToInt32(Math.Round(percentage, 0));
+                    progress.Report((pecentageInt, taskResolved)); //NOTE: firing the progress Report EventHandler
+                }
+
+                return internalTask;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+
+        }).ToList();
+
+        await Task.WhenAll(tasks);
+    }
+    private async Task<List<string>> GetCards(int amountofCardsToGenerate)
+    {
+        return await Task.Run(() =>
+        {
+            var cards = new List<string>();
+            for (int i = 1; i <= amountofCardsToGenerate; i++)
+            {
+                cards.Add(i.ToString().PadLeft(16, '0'));
+            }
+            return cards;
+        });
+
+
+    }
+
+}
