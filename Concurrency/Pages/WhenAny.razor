@@ -5,9 +5,9 @@
 @using System.Diagnostics
 @inject IConfiguration Config;
 
-<h1>IProgress</h1>
+<h1>When Any</h1>
 
-<button @onclick="HandleClick">Start</button>
+<button class="btn btn-primary" @onclick="HandleClick">Start</button>
 
 <div class="row col-md-6">
     <p>@text</p>
@@ -42,8 +42,8 @@
     private string text = "";
     private string apiURL = "";
     public HttpClient httpClient = new();
-    private int NbCardsToProcess = 500;
-    private int SemaphoreSize = 100;
+    private int NbCardsToProcess = 1000;
+    private int SemaphoreSize = 200;
     private int pgCards;
     private int nbCardsProcessed;
 
@@ -52,7 +52,7 @@
     private async Task HandleClick()
     {
         var progressReport = new Progress<(int, int)>(ReportCardProcessingProgress);
-        
+
         text = "";
         pgCards = 0;
         nbCardsProcessed = 0;
@@ -65,7 +65,7 @@
             apiURL = Config.GetValue<string>("apiURL");
             var cards = await GetCards(NbCardsToProcess);
             stopWatch.Start();
-            
+
             await ProcessCards(cards, progressReport);
 
             text = $"Operation done in : {stopWatch.ElapsedMilliseconds / 1000.0} seconds";
@@ -80,43 +80,33 @@
         }
     }
 
-    
+
     private async void ReportCardProcessingProgress((int percentage, int nbTask) reportedValues)
     {
         pgCards = reportedValues.percentage;
         nbCardsProcessed = reportedValues.nbTask;
-        
+
         await InvokeAsync(() => StateHasChanged());
     }
 
-    
+
     private async Task ProcessCards(List<string> cards, IProgress<(int, int)>? progress)
     {
         using var semaphore = new SemaphoreSlim(SemaphoreSize);
 
-        var tasks = new List<Task<HttpResponseMessage>>();
-
-        int taskResolved = 0;
+        List<Task<HttpResponseMessage>> tasks = new();
 
         tasks = cards.Select(async card =>
         {
             var json = JsonConvert.SerializeObject(card);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+            //NOTE: The progress monitoring was done below , but this can be slow
+            //dependng on the complexity of the computation: we will implement whenAny lower
             await semaphore.WaitAsync();
             try
             {
                 var internalTask = await httpClient.PostAsync($"{apiURL}/cards", content);
-
-                //NOTE: This data sending and interim computation for sending back progress can be very slow 
-                //, dependng on the complexity of the computation: that's why we implement a when any
-                if (progress is not null)
-                {
-                    taskResolved++;
-                    double percentage = (double)taskResolved / cards.Count * 100;
-                    var pecentageInt = Convert.ToInt32(Math.Round(percentage, 0));
-                    progress.Report((pecentageInt, taskResolved)); 
-                }
 
                 return internalTask;
             }
@@ -124,26 +114,45 @@
             {
                 semaphore.Release();
             }
-
         }).ToList();
 
-        var responses = await Task.WhenAll(tasks);
+        Task<HttpResponseMessage[]> responsesTasks = Task.WhenAll(tasks); //NOTE: we remove the await
 
-        var rejectedCards = new List<string>();
-        
+        //NOTE: when Any, we only return the first task that finished, what we are doing here is reporting progress each 2s
+        //we will exit the while once the 2 list of http response are identical
+        if (progress is not null)
+        {
+            int completedTasks = 0;
+            while (await Task.WhenAny(responsesTasks, Task.Delay(TimeSpan.FromSeconds(1))) != responsesTasks
+            || (completedTasks != NbCardsToProcess))
+            {
+                completedTasks = tasks.Where(x => x.IsCompleted).Count();
+                double percentage = (double)completedTasks / tasks.Count * 100;
+                int pecentageInt = Convert.ToInt32(Math.Round(percentage, 0));
+                progress.Report((pecentageInt, completedTasks));
+            }
+        }
+
+        HttpResponseMessage[] responses = await responsesTasks;
+        //NOTE: we already await above in the when any, however this await operator knows if a task is completed, and knows it has nothing to do
+        // it will then move to the next line of code without suspending the execution of the current thread
+        //awaiting twice does not mean it will be run twice
+
+        List<string> rejectedCards = new();
+
         responses.ToList().ForEach(async response =>
         {
             var content = await response.Content.ReadAsStringAsync();
             var responseCard = JsonConvert.DeserializeObject<CardResponse>(content);
-            if ( responseCard?.Approved == false)
+            if (responseCard?.Approved == false)
             {
                 rejectedCards.Add(responseCard.Card);
             }
         });
 
-        rejectedCards.ToList().ForEach(card =>    Console.WriteLine($"Card {card} was rejected"));
+        rejectedCards.ToList().ForEach(card => Console.WriteLine($"Card {card} was rejected"));
         Console.WriteLine($"{rejectedCards.Count} cards were rejected");
-        
+
     }
     private async Task<List<string>> GetCards(int amountofCardsToGenerate)
     {
