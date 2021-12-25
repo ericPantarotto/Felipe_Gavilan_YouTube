@@ -24,7 +24,6 @@
 <div class="col-md-3">
     <h2>Efficient Code CONSOLE </h2>
     <button class="btn btn-primary" @onclick="HandleEfficientConsoleClick">StartEfficient</button>
-    <p class="lead" style="background-color:powderblue;" >@timElapsedEfficientConsole</p>
 </div>
 </div>
 
@@ -36,7 +35,6 @@
     private string? textEfficient;
     private string? timElapsed;
     private string? timElapsedEfficient;
-    private string? timElapsedEfficientConsole;
     private async Task HandleClick()
     {
         Stopwatch stopWatch = new();
@@ -58,7 +56,6 @@
 
         stopWatch.Stop();
 
-        //text = string.Concat(text, $"\r\nDuration: {stopWatch.Elapsed.Seconds} seconds", "\r\nThe End!");
         timElapsed = string.Concat($"Duration: {stopWatch.Elapsed.Seconds} seconds", "\r\nThe End!");
     }
 
@@ -74,7 +71,6 @@
         List<string> names = new() { "Felipe", "Claudia", "Robert", "Rajan" };
         var validations = names.Select(async name => results.Add( await DoValidations(name)));
         
-        //var validations = names.Select(name =>DoValidations(name));
         await Task.WhenAll(validations);
         results.ForEach(result => textEfficient = string.Concat(textEfficient, result));
         

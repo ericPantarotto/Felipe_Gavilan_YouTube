@@ -1,0 +1,81 @@
+﻿@page "/Github"
+@using System.Diagnostics
+@using System.Net.Http.Headers;
+@using System.Net.Http.Json;
+
+<style>
+    p {
+        white-space: pre-wrap;
+    }
+</style>
+
+<div class="row">
+
+    <div class="col-md-3">
+        <h2>.Net6 Github </h2>
+        <button class="btn btn-primary" @onclick="HandleNet6Console">Start</button>
+        <p>@text</p>
+        <p class="lead" style="background-color:powderblue;" >@timElapsedEfficient</p>
+    </div>
+</div>
+
+
+
+
+
+
+@code {
+    //NOTE: https://www.hanselman.com/blog/parallelforeachasync-in-net-6
+    private string? text;
+    private string? timElapsedEfficient;
+    private List<GitHubUser> results = new();
+    private async Task HandleNet6Console()
+    {
+        var userHandlers = new[]
+        {
+        "users/okyrylchuk",
+        "users/shanselman",
+        "users/jaredpar",
+        "users/davidfowl",
+        "users/ericPantarotto",
+        };
+
+        using HttpClient client = new()
+        {
+            BaseAddress = new Uri("https://api.github.com"),
+        };
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("DotNet", "6"));
+
+        ParallelOptions parallelOptions = new()
+        {
+            MaxDegreeOfParallelism = 2
+        };
+
+        Console.WriteLine("Begin! Parallel Async .Net6.0:");
+        Stopwatch stopWatch = new();
+        stopWatch.Start();
+        timElapsedEfficient = "";
+
+        await Parallel.ForEachAsync(userHandlers, parallelOptions, async (uri, token) =>
+        {
+            var user = await client.GetFromJsonAsync<GitHubUser>(uri, token);
+            results.Add(user?? throw new ArgumentNullException(nameof(user)));
+            Console.WriteLine($"Name: {user?.Name}\nBio: {user?.Bio}\nType: {user?.Type}\n");
+            await Task.Delay(3000);
+        }); 
+
+
+        stopWatch.Stop();
+        Console.WriteLine(string.Concat($"Duration: {stopWatch.Elapsed.Seconds} seconds", "\r\nThe End!"));
+        timElapsedEfficient = string.Concat($"Duration: {stopWatch.Elapsed.Seconds} seconds", "\r\nThe End!");
+        results.ForEach(result => text = string.Concat(text, $"\r\n{result.Name}", $"\r\n{result.Bio}"));
+    }
+
+    private class GitHubUser
+    {
+        public string? Name { get; set; }
+        public string?  Bio { get; set; }
+        public string?  Type { get; set; }
+    }
+
+}
