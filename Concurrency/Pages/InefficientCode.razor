@@ -1,0 +1,161 @@
+﻿@page "/InefficientCode"
+@using System.Diagnostics
+<style>
+    p {
+        white-space: pre-wrap;
+    }
+</style>
+
+<div class="row">
+<div class="col-md-3">
+    <h2>Inefficient Code </h2>
+    <button class="btn btn-primary" @onclick="HandleClick">Start</button>
+    <p>@text</p>
+    <p class="lead" style="background-color:powderblue;" >@timElapsed</p>
+</div>
+
+<div class="col-md-3">
+    <h2>Efficient Code </h2>
+    <button class="btn btn-primary" @onclick="HandleEfficientClick">StartEfficient</button>
+    <p>@textEfficient</p>
+    <p class="lead" style="background-color:powderblue;" >@timElapsedEfficient</p>
+</div>
+
+<div class="col-md-3">
+    <h2>Efficient Code CONSOLE </h2>
+    <button class="btn btn-primary" @onclick="HandleEfficientConsoleClick">StartEfficient</button>
+    <p class="lead" style="background-color:powderblue;" >@timElapsedEfficientConsole</p>
+</div>
+</div>
+
+
+
+
+@code {
+    private string? text;
+    private string? textEfficient;
+    private string? timElapsed;
+    private string? timElapsedEfficient;
+    private string? timElapsedEfficientConsole;
+    private async Task HandleClick()
+    {
+        Stopwatch stopWatch = new();
+        stopWatch.Start();
+        timElapsed= "";
+        text = "Begin! Inefficient one by one:";
+
+        List<string> names = new() { "Felipe", "Claudia", "Robert", "Rajan" };
+
+        foreach (var name in names)
+        {
+            text = string.Concat(text, await Method1(name));
+            text = string.Concat(text, await Method2(name));
+            text = string.Concat(text, await Method3(name));
+            text = string.Concat(text, await Method4(name));
+
+            StateHasChanged();
+        }
+
+        stopWatch.Stop();
+
+        //text = string.Concat(text, $"\r\nDuration: {stopWatch.Elapsed.Seconds} seconds", "\r\nThe End!");
+        timElapsed = string.Concat($"Duration: {stopWatch.Elapsed.Seconds} seconds", "\r\nThe End!");
+    }
+
+    private async Task HandleEfficientClick()
+    {
+        List<string> results = new();
+        Stopwatch stopWatch = new();
+        stopWatch.Start();
+        timElapsedEfficient= "";
+        textEfficient = "Begin! Efficient in //:";
+        StateHasChanged();
+
+        List<string> names = new() { "Felipe", "Claudia", "Robert", "Rajan" };
+        var validations = names.Select(async name => results.Add( await DoValidations(name)));
+        
+        //var validations = names.Select(name =>DoValidations(name));
+        await Task.WhenAll(validations);
+        results.ForEach(result => textEfficient = string.Concat(textEfficient, result));
+        
+        stopWatch.Stop();
+        timElapsedEfficient = string.Concat($"Duration: {stopWatch.Elapsed.Seconds} seconds", "\r\nThe End!");
+    }
+    private async Task HandleEfficientConsoleClick()
+    {
+        List<string> results = new();
+        Stopwatch stopWatch = new();
+        stopWatch.Start();
+        timElapsedEfficient= "";
+        
+        Console.WriteLine("Begin! simultaneously accross different name:");
+        StateHasChanged();
+
+        List<string> names = new() { "Felipe", "Claudia", "Robert", "Rajan" };
+        
+        var validations = names.Select(name =>DoValidationsConsole(name));
+        await Task.WhenAll(validations);
+        
+        
+        stopWatch.Stop();
+        Console.WriteLine(string.Concat($"Duration: {stopWatch.Elapsed.Seconds} seconds", "\r\nThe End!"));
+    }
+
+    private async Task<string> Method1(string name)
+    {
+        await Task.Delay(500);
+        return $"\r\nMethod 1 {name}";
+    }
+    private async Task<string> Method2(string name)
+    {
+        await Task.Delay(500);
+        return $"\r\nMethod 2 {name}";
+    }
+    private async Task<string> Method3(string name)
+    {
+        await Task.Delay(500);
+        return $"\r\nMethod 3 {name}";
+    }
+    private async Task<string> Method4(string name)
+    {
+        await Task.Delay(500);
+        return $"\r\nMethod 4 {name}";
+    }
+
+    private async Task<string> DoValidations(string name)
+    {
+
+        string textEfficient = await Method1(name);
+        textEfficient = string.Concat(textEfficient,await Method2(name));
+        textEfficient = string.Concat(textEfficient, await Method3(name));
+        textEfficient = string.Concat(textEfficient, await Method4(name));
+        return textEfficient;
+    }
+    private async Task DoValidationsConsole(string name)
+    {
+        await Method1Console(name);
+        await Method2Console(name);
+        await Method3Console(name);
+        await Method4Console(name);   
+    }
+    private async Task Method1Console(string name)
+    {
+        await Task.Delay(500);
+        Console.WriteLine($"Method 1 {name}");
+    }
+    private async Task Method2Console(string name)
+    {
+        await Task.Delay(500);
+        Console.WriteLine($"Method 2 {name}");
+    }
+    private async Task Method3Console(string name)
+    {
+        await Task.Delay(500);
+        Console.WriteLine($"Method 3 {name}");
+    }
+    private async Task Method4Console(string name)
+    {
+        await Task.Delay(500);
+        Console.WriteLine($"Method 4 {name}");
+    }
+}
