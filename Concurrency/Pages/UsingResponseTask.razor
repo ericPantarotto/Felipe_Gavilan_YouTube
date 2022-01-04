@@ -1,0 +1,114 @@
+﻿@page "/UsingResponseTask"
+@using Models
+@using Newtonsoft.Json;
+@using System.Text
+@using System.Diagnostics
+@inject IConfiguration Config;
+
+<h1>Using Repsonse Tasks</h1>
+
+<button @onclick="HandleClick">Start</button>
+
+<div class="row col-md-6">
+    <p>@text</p>
+</div>
+<div class="row col-md-6">
+    <p>@textRejectedCards</p>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private string textRejectedCards = "";
+    private string apiURL = "";
+    public HttpClient httpClient = new();
+
+    private async Task HandleClick()
+    {
+        imageHidden = false;
+
+        var stopWatch = new Stopwatch();
+
+        try
+        {
+            apiURL = Config.GetValue<string>("apiURL");
+            var cards = await GetCards(20);
+            stopWatch.Start();
+
+            await ProcessCards(cards);
+        }
+        catch (HttpRequestException ex)
+        {
+            text = ex.Message;
+        }
+
+        text = $"Operation done in : {stopWatch.ElapsedMilliseconds / 1000.0} seconds";
+        
+        imageHidden = true;
+    }
+
+    private async Task ProcessCards(List<string> cards)
+    {
+        using var semaphore = new SemaphoreSlim(3);
+
+        var tasks = new List<Task<HttpResponseMessage>>();
+
+        tasks = cards.Select(async card =>
+        {
+            var json = JsonConvert.SerializeObject(card);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            await semaphore.WaitAsync();
+            try
+            {
+                return await httpClient.PostAsync($"{apiURL}/cards", content);     
+            }
+            finally 
+            {
+                semaphore.Release();
+            }
+            
+        }).ToList();
+
+        HttpResponseMessage[] responses = await Task.WhenAll(tasks); 
+
+        List<string> rejectedCards = new();
+        
+        responses.ToList().ForEach(async response =>
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            var responseCard = JsonConvert.DeserializeObject<CardResponse>(content);
+            if ( responseCard?.Approved == false)
+            {
+                rejectedCards.Add(responseCard.Card);
+            }
+        });
+
+        rejectedCards.ToList().ForEach(card => Console.WriteLine($"Card {card} was rejected"));
+        Console.WriteLine($"{rejectedCards.Count} cards were rejected");
+        textRejectedCards = $"{rejectedCards.Count} cards were rejected";
+        
+    }
+    private async Task<List<string>> GetCards(int amountofCardsToGenerate)
+    {
+        return await Task.Run(() =>
+        {
+            var cards = new List<string>();
+            for (int i = 1; i <= amountofCardsToGenerate; i++)
+            {
+                cards.Add(i.ToString().PadLeft(16, '0'));
+            }
+            return cards;
+        });
+
+
+    }
+
+}
