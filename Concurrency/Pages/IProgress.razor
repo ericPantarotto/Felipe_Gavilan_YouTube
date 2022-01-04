@@ -52,7 +52,7 @@
     private async Task HandleClick()
     {
         //NOTE: declaring a progress element that will fire a paricular method in the Process card method
-        var progressReport = new Progress<(int, int)>(ReportCardProcessingProgress);
+        Progress<(int, int)> progressReport = new (ReportCardProcessingProgress);
         
         text = "";
         pgCards = 0;
@@ -86,7 +86,7 @@
     {
         pgCards = reportedValues.percentage;
         nbCardsProcessed = reportedValues.nbTask;
-        //await InvokeAsync(() => StateHasChanged());
+        
         await InvokeAsync(() => StateHasChanged());
     }
 
@@ -95,7 +95,7 @@
     {
         using var semaphore = new SemaphoreSlim(SemaphoreSize);
 
-        var tasks = new List<Task<HttpResponseMessage>>();
+        List<Task<HttpResponseMessage>> tasks = new();
 
         int taskResolved = 0;
 
@@ -107,14 +107,14 @@
             await semaphore.WaitAsync();
             try
             {
-                var internalTask = await httpClient.PostAsync($"{apiURL}/cards", content);
+                HttpResponseMessage internalTask = await httpClient.PostAsync($"{apiURL}/cards", content);
 
-                //HANDLE
+                //Reporting of the progress
                 if (progress is not null)
                 {
                     taskResolved++;
                     double percentage = (double)taskResolved / cards.Count * 100;
-                    var pecentageInt = Convert.ToInt32(Math.Round(percentage, 0));
+                    int pecentageInt = Convert.ToInt32(Math.Round(percentage, 0));
                     progress.Report((pecentageInt, taskResolved)); //NOTE: firing the progress Report EventHandler
                 }
 
