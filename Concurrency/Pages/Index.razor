@@ -6,7 +6,7 @@
 <button @onclick="HandleClick">Start</button>
 
 <div class="row col-md-6" >
-    <input id="textBox" value="@text" placeholder="enter text..."/>
+    <input id="textBox" value="@text" placeholder="text will be displayed..."/>
 </div>
 
 <div class="row" >
@@ -37,6 +37,7 @@
     private async Task Wait()
     {
         //Thread.Sleep(TimeSpan.FromSeconds(5));
+
         await Task.Delay(TimeSpan.FromSeconds(5));
     }
 

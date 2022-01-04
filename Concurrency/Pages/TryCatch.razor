@@ -1,15 +1,29 @@
 ﻿@page "/TryCatch"
 @inject IConfiguration Config;
 
+<style>
+    label {
+    display: block;
+    font: 1rem 'Fira Sans', sans-serif;
+  	color: blue;
+    margin: .4rem 0;
+}
+</style>
+
+
 <h1>Try Catch</h1>
 
 <button @onclick="HandleClick">Start</button>
-<input id="textBox" @bind="InputValue" placeholder="enter text..." type="search" />
+
+<div class="row">     
+    <div class="form-group">
+        <label id="lbTextBox" for="textBox" color="grey">Input for text box</label>
+        <input class="form-control" id="textBox" @bind="InputValue" placeholder="enter text..." type="search" />
+    </div>
+</div>
 
 <div class="row col-md-6">
     <p>@text</p>
-
-
 </div>
 
 <div class="row">

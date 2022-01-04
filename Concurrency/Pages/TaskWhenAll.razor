@@ -8,6 +8,13 @@
 
 <button @onclick="HandleClick">Start</button>
 
+<div class="row">     
+    <div class="form-group">
+        <label id="lbTextBox" for="textBox" color="grey">To test UI responsiveness</label>
+        <input class="form-control" id="textBox" placeholder="enter text..." type="search" />
+    </div>
+</div>
+
 <div class="row col-md-6">
     <p>@text</p>
 </div>
@@ -27,17 +34,20 @@
 
     private async Task HandleClick()
     {
+        text = "";
         imageHidden = false;
 
-        var stopWatch = new Stopwatch();
+        Stopwatch stopWatch = new();
 
         try
         {
             apiURL = Config.GetValue<string>("apiURL");
-            var cards = await GetCards(2000);
+            var cards = await GetCards(1000);
             stopWatch.Start();
 
             await ProcessCards(cards);
+
+            await LazyManner();
         }
         catch (HttpRequestException ex)
         {
@@ -51,7 +61,7 @@
 
     private async Task ProcessCards(List<string> cards)
     {
-        var tasks = new List<Task<HttpResponseMessage>>();
+        List<Task<HttpResponseMessage>> tasks = new();
 
         await Task.Run(() =>
         {
@@ -77,8 +87,29 @@
             }
             return cards;
         });
-
-
     }
+
+    private async Task LazyManner()
+    {
+        Console.WriteLine("Hello World!");
+ 
+        var numbers = Enumerable.Range(1, 10);
+        int numberToPrint = 0;
+        var tasks = numbers.Select(async number =>
+        {
+            await Task.Delay(1);
+            Console.WriteLine("This ran");
+            
+            numberToPrint += number;
+        });
+
+        //NOTE: if you leave below commented, the content of Select never gets hit
+        //await Task.WhenAll(tasks);
+ 
+        await Task.Delay(1000);
+ 
+        Console.WriteLine($"End - final number is {numberToPrint}");
+    }
+    
 
 }

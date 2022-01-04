@@ -1,4 +1,5 @@
 ﻿@page "/TaskT"
+@inject IConfiguration Config;
 
 <h1>Task T</h1>
 
@@ -22,19 +23,21 @@
 @code{
     private bool imageHidden = true;
     private string text = "";
-    private string apiURL = "https://localhost:7282";
+    private string apiURL = "";
     public HttpClient httpClient = new ();
     private string? InputValue { get; set; }
 
     private async Task HandleClick()
     {
         imageHidden = false;
-
+        
+        apiURL = Config.GetValue<string>("apiURL");
+        
         text = "";
                 
-        //var greeting = await GetGreetings(InputValue ?? throw new ArgumentNullException(nameof(InputValue)));
-        var greeting = await GetGreetings(InputValue ?? string.Empty );
-        text =  greeting;
+        //text = await GetGreetings(InputValue ?? throw new ArgumentNullException(nameof(InputValue)));
+        text = await GetGreetings(InputValue ?? string.Empty );
+
         imageHidden = true;
     }
 

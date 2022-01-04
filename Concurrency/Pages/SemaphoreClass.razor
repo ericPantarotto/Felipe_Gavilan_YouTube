@@ -34,7 +34,7 @@
         try
         {
             apiURL = Config.GetValue<string>("apiURL");
-            var cards = await GetCards(2000);
+            var cards = await GetCards(20);
             stopWatch.Start();
 
             await ProcessCards(cards);
@@ -51,7 +51,7 @@
 
     private async Task ProcessCards(List<string> cards)
     {
-        using var semaphore = new SemaphoreSlim(400);
+        using var semaphore = new SemaphoreSlim(3);
 
         var tasks = new List<Task<HttpResponseMessage>>();
 
