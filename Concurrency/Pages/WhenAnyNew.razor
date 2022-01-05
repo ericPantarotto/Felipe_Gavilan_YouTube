@@ -225,7 +225,6 @@
         var tAwaited = await Task.WhenAll(tasks);
 
         imageHidden = true;
-        
         foreach(var res in tAwaited )
         {
             string txtDisplay = $"Address: {res.Url} => ping result: {res.ReplyStatus}\r\n";
@@ -233,15 +232,5 @@
             textUrl += txtDisplay;
         }
 
-        @*var t = Task.WhenAll(tasks);
-        try {
-            t.Wait();
-        }
-        catch {} 
-
-        if (t.Status == TaskStatus.RanToCompletion)
-            Console.WriteLine("All ping attempts succeeded.");
-        else if (t.Status == TaskStatus.Faulted)
-            Console.WriteLine("{0} ping attempt(s) failed", failed); *@
     } 
 }
