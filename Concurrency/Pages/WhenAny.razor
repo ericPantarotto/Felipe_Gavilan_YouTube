@@ -23,10 +23,11 @@
 
 </div>
 <div class="col-md-4">
-    cards: @nbCardsProcessed / @NbCardsToProcess
+    cards created: @nbCardsProcessed / @NbCardsToProcess
 </div>
-<div class="row">
 
+<div class="row col-md-6">
+    <p>@textRejectedCards</p>
 </div>
 
 <div class="row">
@@ -40,13 +41,14 @@
 @code {
     private bool imageHidden = true;
     private string text = "";
+    private string textRejectedCards = "";
     private string apiURL = "";
     public HttpClient httpClient = new();
-    private int NbCardsToProcess = 1000;
-    private int SemaphoreSize = 200;
+    private int NbCardsToProcess = 5000;
+    private int SemaphoreSize = 400;
     private int pgCards;
     private int nbCardsProcessed;
-
+    
 
 
     private async Task HandleClick()
@@ -58,7 +60,7 @@
         nbCardsProcessed = 0;
         imageHidden = false;
 
-        var stopWatch = new Stopwatch();
+        Stopwatch stopWatch = new();
 
         try
         {
@@ -123,7 +125,7 @@
         if (progress is not null)
         {
             int completedTasks = 0;
-            while (await Task.WhenAny(responsesTasks, Task.Delay(TimeSpan.FromSeconds(1))) != responsesTasks
+            while (await Task.WhenAny(responsesTasks, Task.Delay(TimeSpan.FromSeconds(2))) != responsesTasks
             || (completedTasks != NbCardsToProcess))
             {
                 completedTasks = tasks.Where(x => x.IsCompleted).Count();
@@ -134,9 +136,6 @@
         }
 
         HttpResponseMessage[] responses = await responsesTasks;
-        //NOTE: we already await above in the when any, however this await operator knows if a task is completed, and knows it has nothing to do
-        // it will then move to the next line of code without suspending the execution of the current thread
-        //awaiting twice does not mean it will be run twice
 
         List<string> rejectedCards = new();
 
@@ -152,6 +151,7 @@
 
         rejectedCards.ToList().ForEach(card => Console.WriteLine($"Card {card} was rejected"));
         Console.WriteLine($"{rejectedCards.Count} cards were rejected");
+        textRejectedCards = $"{rejectedCards.Count} cards were rejected";
 
     }
     private async Task<List<string>> GetCards(int amountofCardsToGenerate)

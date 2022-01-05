@@ -3,35 +3,56 @@
 @using Newtonsoft.Json;
 @using System.Text
 @using System.Diagnostics
+@using System.Net.NetworkInformation
 @inject IConfiguration Config;
 
-<h1>When Any</h1>
+<style>
+.input-group{
+    height:100px;
+    margin: .4rem 0;
+    }
 
-<button class="btn btn-primary" @onclick="HandleClick">Start</button>
+</style>
 
-<div class="row col-md-6">
-    <p>@text</p>
-</div>
+<div class="container">
+     <div class="row">
+        <div class="col-md-6">
+            <h1>When Any NEW</h1>
+            <button class="btn btn-primary" @onclick="HandleClick">Start</button>
+            <div class="row">
+                <p>@text</p>
+            </div>
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="progress">
-            <div class="progress-bar h-75" role="progressbar" style="width: @pgCards%" aria-valuenow="@pgCards"
-                aria-valuemin="0" aria-valuemax="100">@pgCards%</div>
+            <div class="row">
+                <div class="progress">
+                    <div class="progress-bar h-75" role="progressbar" style="width: @pgCards%" aria-valuenow="@pgCards"
+                        aria-valuemin="0" aria-valuemax="100">@pgCards%</div>
+                </div>
+            </div>
+            <div class="row">
+                cards created: @nbCardsProcessed / @NbCardsToProcess
+            </div>
+            <div class="row">
+                <p>@textRejectedCards</p>
+            </div>
+
+            <div class="row">
+                <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+            </div>
+        </div>    
+        
+        <div class="col-md-6">
+            <h1>When Any Ping Urls</h1>
+            <button class="btn btn-primary" @onclick="HandleClickMsft">Ping</button>
+
+            <div class="input-group">
+                <textarea class="form-control" @bind="InputValue" aria-label="With textarea"></textarea>
+            </div>
+            <div class="row">
+                <p>@textUrl</p>
+            </div>
+            
         </div>
-    </div>
-
-</div>
-<div class="col-md-4">
-    cards created: @nbCardsProcessed / @NbCardsToProcess
-</div>
-<div class="row">
-
-</div>
-
-<div class="row">
-    <div class="col-md-6">
-        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
     </div>
 </div>
 
@@ -40,12 +61,21 @@
 @code {
     private bool imageHidden = true;
     private string text = "";
+    private string textRejectedCards = "";
     private string apiURL = "";
     public HttpClient httpClient = new();
     private int NbCardsToProcess = 1000;
     private int SemaphoreSize = 200;
     private int pgCards;
     private int nbCardsProcessed;
+    private string? InputValue { get; set; } 
+    private string textUrl = "";
+    
+    protected override void OnParametersSet()
+    {
+        InputValue= "www.adatum.com,www.cohovineyard.com,www.cohowinery.com, www.northwindtraders.com,www.contoso.com";
+        
+    }
     private async Task HandleClick()
     {
         var progressReport = new Progress<(int, int)>(ReportCardProcessingProgress);
@@ -110,7 +140,9 @@
         }).ToList();
 
         Task<HttpResponseMessage[]> responsesTasks = Task.WhenAll(tasks);
-
+        
+        List<string> rejectedCards = new();
+        
         if (progress is not null)
         {
             int completedTasks = 0;
@@ -121,18 +153,22 @@
                 double percentage = (double)completedTasks / tasks.Count * 100;
                 int pecentageInt = Convert.ToInt32(Math.Round(percentage, 0));
                 progress.Report((pecentageInt, completedTasks));
-            }
-        }
 
-        List<string> rejectedCards = new();
-        foreach (var response in responsesTasks.Result)
-        {
-             var content = await response.Content.ReadAsStringAsync();
-            var responseCard = JsonConvert.DeserializeObject<CardResponse>(content);
-            if (responseCard?.Approved == false)
-            {
-                rejectedCards.Add(responseCard.Card);
-            } 
+
+                foreach(var t in tasks)
+                {
+                    if(t.Status is TaskStatus.RanToCompletion)
+                    {
+                        var content = await t.Result.Content.ReadAsStringAsync();
+                        var responseCard = JsonConvert.DeserializeObject<CardResponse>(content);
+                        if (responseCard?.Approved == false)
+                        {
+                            rejectedCards.Add(responseCard.Card);
+                        }
+                    }
+                }
+                textRejectedCards = $"{rejectedCards.Count} cards were rejected";
+            }
         }
 
         rejectedCards.ToList().ForEach(card => Console.WriteLine($"Card {card} was rejected"));
@@ -152,4 +188,60 @@
         });
     }
 
+    private async Task HandleClickMsft()
+    {
+        textUrl = "";
+        int failed = 0;
+        
+        string[] urls = InputValue?.Split(',') ?? throw new ArgumentNullException(nameof(InputValue));
+        
+        imageHidden = false;
+
+        var tasks = urls.Select(async url => 
+            { 
+                
+                return await Task.Run(() =>
+                {
+                    Ping png = new();
+                    PingResponse pingResponse = new(){ Url = url};
+                    try {
+                        
+                        PingReply reply = png.Send(url);
+                        pingResponse.ReplyStatus = reply.Status.ToString();
+                        
+                        if (! (reply.Status == IPStatus.Success)) {
+                            Interlocked.Increment(ref failed);
+                        }    
+                    }
+                    catch (PingException ex) {
+                        Interlocked.Increment(ref failed);
+                        pingResponse.ReplyStatus = ex.Message;  
+                    }
+                    
+                    return pingResponse;
+                });
+            });
+        
+        var tAwaited = await Task.WhenAll(tasks);
+
+        imageHidden = true;
+        
+        foreach(var res in tAwaited )
+        {
+            string txtDisplay = $"Address: {res.Url} => ping result: {res.ReplyStatus}\r\n";
+            Console.WriteLine(txtDisplay);
+            textUrl += txtDisplay;
+        }
+
+        @*var t = Task.WhenAll(tasks);
+        try {
+            t.Wait();
+        }
+        catch {} 
+
+        if (t.Status == TaskStatus.RanToCompletion)
+            Console.WriteLine("All ping attempts succeeded.");
+        else if (t.Status == TaskStatus.Faulted)
+            Console.WriteLine("{0} ping attempt(s) failed", failed); *@
+    } 
 }
