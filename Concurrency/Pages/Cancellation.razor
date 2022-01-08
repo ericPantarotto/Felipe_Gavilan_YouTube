@@ -27,7 +27,7 @@
     cards created: @nbCardsProcessed / @NbCardsToProcess
 </div>
 <div class="row">
-
+    <p>@textRejectedCards</p>
 </div>
 
 <div class="row">
@@ -41,6 +41,7 @@
 @code {
     private bool imageHidden = true;
     private string text = "";
+    private string textRejectedCards = "";
     private string apiURL = "";
     public HttpClient httpClient = new();
     private int NbCardsToProcess = 1000;
@@ -79,7 +80,8 @@
         }
         catch(OperationCanceledException){
             text = "Operation was cancelled";
-            pgCards = nbCardsProcessed =  0;
+            //pgCards = nbCardsProcessed =  0;
+            pgCards = 0;
             StateHasChanged();
         }
         finally{
@@ -87,7 +89,6 @@
             //NOTE: our cts implements IDisposable
             cts.Dispose(); 
             ctsProgress.Dispose();
-            
         }
     }
 
@@ -114,6 +115,8 @@
     //NOTE: Default value will be a dummy cancellation token, so that if the client of the method
     // doesn't want to send a cancellation token , the client doesn't have too
     {
+        textRejectedCards = "";
+        nbCardsProcessed =  0;
         using var semaphore = new SemaphoreSlim(SemaphoreSize);
 
         List<Task<HttpResponseMessage>> tasks = cards.Select(async card =>
@@ -137,6 +140,8 @@
 
         Task<HttpResponseMessage[]> responsesTasks = Task.WhenAll(tasks);
 
+        List<string> rejectedCards = new();
+
         if (progress is not null){
             int completedTasks = 0;
 
@@ -151,22 +156,26 @@
                 double percentage = (double)completedTasks / tasks.Count * 100;
                 int pecentageInt = Convert.ToInt32(Math.Round(percentage, 0));
                 progress.Report((pecentageInt, completedTasks));
-            } 
-        }
 
-        List<string> rejectedCards = new();
-        foreach (var response in responsesTasks.Result)
-        {
-            var content = await response.Content.ReadAsStringAsync();
-            var responseCard = JsonConvert.DeserializeObject<CardResponse>(content);
-            if (responseCard?.Approved == false)
-            {
-            rejectedCards.Add(responseCard.Card);
-            }
+                foreach(var t in tasks)
+                {
+                    if(t.Status is TaskStatus.RanToCompletion)
+                    {
+                        var content = await t.Result.Content.ReadAsStringAsync();
+                        var responseCard = JsonConvert.DeserializeObject<CardResponse>(content);
+                        if (responseCard?.Approved == false && !rejectedCards.Any(rc => rc == responseCard.Card))
+                        {
+                            rejectedCards.Add(responseCard.Card);
+                        }
+                    }
+                }
+                textRejectedCards = $"{rejectedCards.Count} cards were rejected";
+            } 
         }
 
         rejectedCards.ToList().ForEach(card => Console.WriteLine($"Card {card} was rejected"));
         Console.WriteLine($"{rejectedCards.Count} cards were rejected");
+
     }
     private async Task<List<string>> GetCards(int amountofCardsToGenerate)
     {
