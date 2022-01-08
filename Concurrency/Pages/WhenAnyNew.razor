@@ -161,7 +161,7 @@
                     {
                         var content = await t.Result.Content.ReadAsStringAsync();
                         var responseCard = JsonConvert.DeserializeObject<CardResponse>(content);
-                        if (responseCard?.Approved == false)
+                        if (responseCard?.Approved == false && !rejectedCards.Any(rc => rc == responseCard.Card))
                         {
                             rejectedCards.Add(responseCard.Card);
                         }
