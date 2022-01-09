@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Concurrency", "Concurrency\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConcurrencyApi", "ConcurrencyApi\ConcurrencyApi.csproj", "{A768259A-1A70-4C9B-B613-08E941C0C95D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConcurrencyTest", "ConcurrencyTest\ConcurrencyTest.csproj", "{5166FF3E-E848-4161-8240-44B49E52DF87}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{A768259A-1A70-4C9B-B613-08E941C0C95D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A768259A-1A70-4C9B-B613-08E941C0C95D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A768259A-1A70-4C9B-B613-08E941C0C95D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5166FF3E-E848-4161-8240-44B49E52DF87}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5166FF3E-E848-4161-8240-44B49E52DF87}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5166FF3E-E848-4161-8240-44B49E52DF87}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5166FF3E-E848-4161-8240-44B49E52DF87}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
