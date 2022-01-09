@@ -1,0 +1,215 @@
+﻿@page "/CancelTimeOut"
+@using Models
+@using Newtonsoft.Json;
+@using System.Text
+@using System.Diagnostics
+@inject IConfiguration Config;
+
+<h1>Cancellation Time Out</h1>
+
+<button class="btn btn-primary" @onclick="HandleClick">Start</button>
+<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
+
+<div class="row col-md-6">
+    <p>@text</p>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="progress">
+            <div class="progress-bar h-75" role="progressbar" style="width: @pgCards%" aria-valuenow="@pgCards"
+                aria-valuemin="0" aria-valuemax="100">@pgCards%</div>
+        </div>
+    </div>
+
+</div>
+<div class="col-md-4">
+    @currentProcess: @nbCardsProcessed / @NbCardsToProcess
+</div>
+<div class="row">
+    <p>@textRejectedCards</p>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private string textRejectedCards = "";
+    private string currentProcess = "";
+    private string apiURL = "";
+    public HttpClient httpClient = new();
+    private int NbCardsToProcess = 1000;
+    private int SemaphoreSize = 200;
+    private int pgCards;
+    private int nbCardsProcessed;
+    
+    private CancellationTokenSource cts = new(); 
+    private CancellationTokenSource ctsProgress = new();
+
+    private async Task HandleClick()
+    {
+        cts = new();
+        cts.CancelAfter(TimeSpan.FromSeconds(4));
+        ctsProgress = new();
+        ctsProgress.CancelAfter(TimeSpan.FromSeconds(4));
+        
+        Progress<(int, int)> progressReport = new(ReportCardCreationProcessingProgress);
+
+        text = "";
+        pgCards = 0;
+        nbCardsProcessed = 0;
+        imageHidden = false;
+
+        Stopwatch stopWatch = new();
+        
+        try{
+            apiURL = Config.GetValue<string>("apiURL");
+            currentProcess = "Cards created";
+            var cards = await GetCards(NbCardsToProcess, cts.Token, progressReport);
+            stopWatch.Start();
+
+            currentProcess = "Cards processed";
+            await ProcessCards(cards, progressReport, cts.Token, ctsProgress.Token);
+
+            text = $"Operation done in : {stopWatch.ElapsedMilliseconds / 1000.0} seconds";
+        }
+        catch (HttpRequestException ex){
+            text = ex.Message;
+        }
+        catch(OperationCanceledException){
+            text = "Operation was cancelled";
+            pgCards = 0;
+            StateHasChanged();
+        }
+        finally{
+            imageHidden = true;
+
+            cts.Dispose(); 
+            ctsProgress.Dispose();
+        }
+    }
+
+    private void HandleCancel() 
+    {
+        cts.Cancel();
+        ctsProgress.Cancel();
+    }
+
+    private async void ReportCardCreationProcessingProgress((int percentage, int nbTask) reportedValues)
+    {
+        pgCards = reportedValues.percentage;
+        nbCardsProcessed = reportedValues.nbTask;
+
+        await InvokeAsync(() => StateHasChanged());
+    }
+
+    private async void ReportCardCreationProgress(int nbTask)
+    {
+        nbCardsProcessed = nbTask;
+
+        await InvokeAsync(() => StateHasChanged());
+    }
+
+    private async Task ProcessCards(List<string> cards,
+        IProgress<(int, int)>? progress,
+        CancellationToken token = default,
+        CancellationToken tokenProgress = default) 
+    {
+        textRejectedCards = "";
+        nbCardsProcessed =  0;
+        using var semaphore = new SemaphoreSlim(SemaphoreSize);
+
+        List<Task<HttpResponseMessage>> tasks = cards.Select(async card =>
+        {
+            var json = JsonConvert.SerializeObject(card);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            await semaphore.WaitAsync();
+            try{
+                var internalTask = await httpClient.PostAsync($"{apiURL}/cards", content, token); //NOTE: passing our token
+
+                return internalTask;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }).ToList();
+
+        Task<HttpResponseMessage[]> responsesTasks = Task.WhenAll(tasks);
+
+        List<string> rejectedCards = new();
+
+        if (progress is not null){
+            int completedTasks = 0;
+
+            while (await Task.WhenAny(responsesTasks, Task.Delay(TimeSpan.FromSeconds(1), tokenProgress)) != responsesTasks 
+            || (completedTasks != tasks.Count))
+            {
+                if (cts.Token.IsCancellationRequested ){
+                    cts.Token.ThrowIfCancellationRequested();
+                }
+                    
+                completedTasks = tasks.Where(x => x.IsCompleted).Count();
+                double percentage = (double)completedTasks / tasks.Count * 100;
+                int pecentageInt = Convert.ToInt32(Math.Round(percentage, 0));
+                progress.Report((pecentageInt, completedTasks));
+
+                tasks.ForEach(async t =>
+                {
+                    if(t.Status is TaskStatus.RanToCompletion)
+                    {
+                        var content = await t.Result.Content.ReadAsStringAsync();
+                        var responseCard = JsonConvert.DeserializeObject<CardResponse>(content);
+                        if (responseCard?.Approved == false && !rejectedCards.Any(rc => rc == responseCard.Card))
+                        {
+                            rejectedCards.Add(responseCard.Card);
+                        }
+                    }
+                });
+
+                textRejectedCards = $"{rejectedCards.Count} cards were rejected";
+            } 
+        }
+
+        rejectedCards.ToList().ForEach(card => Console.WriteLine($"Card {card} was rejected"));
+        Console.WriteLine($"{rejectedCards.Count} cards were rejected");
+
+    }
+    private async Task<List<string>> GetCards(int amountofCardsToGenerate, 
+        CancellationToken token = default,
+        IProgress<(int, int)>? progress =default)
+    {
+        textRejectedCards = "";
+        return await Task.Run(async () =>
+        {
+            var cards = new List<string>();
+            for (int i = 1; i <= amountofCardsToGenerate; i++)
+            {
+                //await Task.Delay(TimeSpan.FromSeconds(1));
+                await Task.Delay(TimeSpan.FromMilliseconds(1));
+                cards.Add(i.ToString().PadLeft(16, '0'));
+                
+                Console.WriteLine($"Card number {i} has been created"); //NOTE: adding Feedback on the console
+                
+                double percentage = (double)i / NbCardsToProcess * 100;
+                int pecentageInt = Convert.ToInt32(Math.Round(percentage, 0));
+                progress?.Report((pecentageInt, i));
+                
+                if (cts.Token.IsCancellationRequested ){
+                    //break;
+                    cts.Token.ThrowIfCancellationRequested();
+                }
+            }
+            return cards;
+        });
+    }
+
+}
