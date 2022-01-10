@@ -53,6 +53,10 @@
             Console.WriteLine($"Thread bf the await: {Thread.CurrentThread.ManagedThreadId}");
 
             await Task.Delay(TimeSpan.FromSeconds(1));
+            
+            //REVIEW: Below line has no effect in ASP.NET Core on the opposite of Frameworks such as Winforms & WPF where
+            // synchronisation concept is relevant
+            //await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(continueOnCapturedContext:true);
 
             textAfter = $"Thread after the await: {Thread.CurrentThread.ManagedThreadId}";
             Console.WriteLine($"Thread after the await: {Thread.CurrentThread.ManagedThreadId}");
