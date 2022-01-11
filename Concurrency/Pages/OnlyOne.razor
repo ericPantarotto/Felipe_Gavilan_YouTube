@@ -1,0 +1,137 @@
+﻿@page "/OnlyOne"
+@inject IConfiguration Config;
+
+<style>
+.input-group{
+    height:150px;
+    margin: .4rem 0;
+    }
+</style>
+
+<h1>Only One</h1>
+
+<button class="btn btn-primary" @onclick="HandleClick">Start</button>
+
+<div class="form-group">
+    <label id="lbTextBox" for="textBox" color="grey">Input for text box</label>
+    <div class="input-group">
+        <textarea class="form-control" @bind="InputValue" aria-label="With textarea"></textarea>
+    </div>
+</div>
+
+<div class="row">
+    <p>@textGreeting</p>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+
+
+@code {
+    private string? InputValue { get; set; }
+    private bool imageHidden = true;
+    private string textGreeting = "";
+    private string apiURL = "";
+    public HttpClient httpClient = new();
+    
+    private CancellationTokenSource cts = new(); 
+
+    protected override void OnParametersSet(){
+        apiURL = Config.GetValue<string>("apiURL");
+        InputValue= "Felipe,Claudia,Antonio,Alexandria";
+    }
+
+    private async Task HandleClick(){
+        textGreeting = "";
+        imageHidden = false;
+        
+        string[] names = InputValue?.Split(',').Select(p => p.Trim()).ToArray() ?? throw new ArgumentNullException(nameof(InputValue));
+
+        try{
+            IEnumerable<Func<CancellationToken, Task<string>>> tasks = names.Select(name =>
+            {
+                Func<CancellationToken, Task<string>> func = async (ct) => await GetGreetings(name,ct);
+                return func;
+            });
+            
+            string content = await OnlyOneFunc(tasks);
+
+            textGreeting = content;
+            await InvokeAsync(() => StateHasChanged());
+
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            textGreeting = "you waited 3 seconds";
+            await InvokeAsync(() => StateHasChanged());
+
+            content = await OnlyOneFunc(
+                async (ct) => await GetGreetings("Felipe", ct),
+                async (ct) => await GetGoodbye("Felipe", ct)
+            );
+            textGreeting = content;
+        }
+        catch (Exception ex){
+            textGreeting = $"The operation failed: {ex.Message}";
+        }
+        finally{
+            imageHidden = true;
+            cts.Dispose(); 
+        }
+    }
+    private async Task<T> OnlyOneFunc<T>(IEnumerable<Func<CancellationToken, Task<T>>> functions){
+        CancellationTokenSource cancellationTokenSource = new();
+        
+        IEnumerable<Task<T>> tasks = functions.Select(async function => await function(cancellationTokenSource.Token));
+        Task<T> task = await Task.WhenAny(tasks);
+        cancellationTokenSource.Cancel();
+        return await task;
+    }
+    private async Task<T> OnlyOneFunc<T>(params Func<CancellationToken, Task<T>>[] functions){
+        CancellationTokenSource cancellationTokenSource = new();
+        
+        IEnumerable<Task<T>> tasks = functions.Select(async function => await function(cancellationTokenSource.Token));
+        Task<T> task = await Task.WhenAny(tasks);
+        cancellationTokenSource.Cancel();
+        return await task;
+    }
+    private async Task HandleClickHARDCODED(){
+        textGreeting = "";
+        imageHidden = false;
+        
+        cts = new();
+        CancellationToken token = cts.Token;
+
+        string[] names = InputValue?.Split(',').Select(p => p.Trim()).ToArray() ?? throw new ArgumentNullException(nameof(InputValue));
+
+        try{
+            IEnumerable<Task<string>> taskHttp = names.Select(x => GetGreetings(x, token));
+            Task<string> task = await Task.WhenAny(taskHttp);
+            string content = await task;
+
+            cts.Cancel();
+            textGreeting = content;
+        }
+        catch (Exception ex){
+            textGreeting = $"The operation failed: {ex.Message}";
+        }
+        finally{
+            imageHidden = true;
+            cts.Dispose(); 
+        }
+    }
+    private async Task<string> GetGreetings(string name, CancellationToken token= default){
+        using var response = await httpClient.GetAsync($"{apiURL}/greetings/onlyone/{name}", token);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+    private async Task<string> GetGoodbye(string name, CancellationToken token= default){
+        using var response = await httpClient.GetAsync($"{apiURL}/greetings/goodbye/{name}", token);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }  
+}
+
+

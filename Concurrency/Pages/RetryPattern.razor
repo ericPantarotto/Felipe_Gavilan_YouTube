@@ -75,12 +75,12 @@
             Console.WriteLine($"From GetGreetingsFullReturnsT: {content}");
             textGreeting = $"From GetGreetingsFullReturnsT: {content}";
         }
-        catch (Exception ex){
+        catch (Exception){
             
             //only for RetryLastAwaitNoTry
             //Console.WriteLine(ex.Message);
             //text += $"({retry}) {ex.Message}\r\n";
-
+            
             textAfter = $"The operation failed ({retry} retries)";
         }
         finally{
