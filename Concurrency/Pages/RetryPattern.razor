@@ -1,0 +1,168 @@
+﻿@page "/RetryPattern"
+@inject IConfiguration Config;
+
+<style>
+.input-group{
+    height:150px;
+    margin: .4rem 0;
+    }
+</style>
+
+<h1>Retry Pattern</h1>
+
+<button class="btn btn-primary" @onclick="HandleClick">Start</button>
+<div class="row">     
+    <div class="form-group">
+        <label id="lbTextBox" for="textBox" color="grey">Input for text box</label>
+        <input class="form-control" id="textBox" @bind="InputValue" placeholder="enter text..." type="search" />
+    </div>
+</div>
+
+@* <div class="row col-md-6">
+    <p>@text</p>
+</div> *@
+ <div class="input-group">
+    <textarea class="form-control" aria-label="With textarea">@text</textarea>
+</div>
+
+
+<div class="row">
+    <p>@textAfter</p>
+</div>
+
+<div class="row">
+    <p>@textGreeting</p>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private string textAfter = "";
+    private string textGreeting = "";
+    private string? InputValue { get; set; }
+    private string apiURL = "";
+    public HttpClient httpClient = new();
+    private int retry = 5;
+    private async Task HandleClick(){
+
+        text = "";
+        textAfter = "";
+        textGreeting = "";
+        imageHidden = false;
+
+        try{
+            apiURL = Config.GetValue<string>("apiURL");
+
+            @* await Retry(f:async () =>
+                {
+                    string content = await GetGreetings(InputValue?? throw new ArgumentNullException(nameof(InputValue)) );
+                    Console.WriteLine(content);
+                    textGreeting = content;
+                }, 
+                retryTimes:retry); *@
+
+            //await RetryLastAwaitNoTry(async () =>  await GetGreetingsFull(InputValue ?? throw new ArgumentNullException(nameof(InputValue))));
+
+            string content = await RetryReturnTGeneric(async () =>  await GetGreetingsFullReturnsT(InputValue ?? throw new ArgumentNullException(nameof(InputValue))));
+            Console.WriteLine($"From GetGreetingsFullReturnsT: {content}");
+            textGreeting = $"From GetGreetingsFullReturnsT: {content}";
+        }
+        catch (Exception ex){
+            
+            //only for RetryLastAwaitNoTry
+            //Console.WriteLine(ex.Message);
+            //text += $"({retry}) {ex.Message}\r\n";
+
+            textAfter = $"The operation failed ({retry} retries)";
+        }
+        finally{
+            imageHidden = true;
+        }
+    }
+    private async Task<string> GetGreetings(string name){
+        //using var response = await httpClient.GetAsync($"{apiURL}/greetings/{name}");
+        
+        //forcing the error
+        using var response = await httpClient.GetAsync($"{apiURL}/zzz/{name}");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    private async Task GetGreetingsFull(string name){   
+        using var response = await httpClient.GetAsync($"{apiURL}/zzz/{name}"); //forcing the error
+        response.EnsureSuccessStatusCode();
+        string content = await response.Content.ReadAsStringAsync();
+        Console.WriteLine(content);
+        textGreeting = content;
+    }
+    private async Task<string> GetGreetingsFullReturnsT(string name){   
+        using var response = await httpClient.GetAsync($"{apiURL}/greetings/async/{name}"); //no error
+        //using var response = await httpClient.GetAsync($"{apiURL}/zzz/{name}"); //forcing the error
+        response.EnsureSuccessStatusCode();
+        string content = await response.Content.ReadAsStringAsync();
+        return content;
+    }
+
+    private async Task Retry(Func<Task> f, int retryTimes, int waitTime= 1000){
+        for (int i = 0; i < retryTimes; i++){
+            try{
+                await f();
+                break;
+            }
+            catch (Exception ex){
+                Console.WriteLine(ex.Message);
+                text += $"({i+1}) {ex.Message}\r\n";
+                await InvokeAsync(() => StateHasChanged());
+                await Task.Delay(waitTime);
+                
+                if (i == retryTimes - 1){
+                    throw;
+                }
+            }
+        }
+    }
+
+    private async Task RetryLastAwaitNoTry(Func<Task> f, int retryTimes = 5, int waitTime= 1000){
+        for (int i = 0; i < retryTimes-1; i++){
+            try{
+                await f();
+                break;
+            }
+            catch (Exception ex){
+                Console.WriteLine(ex.Message);
+                text += $"({i+1}) {ex.Message}\r\n";
+                await InvokeAsync(() => StateHasChanged());
+                await Task.Delay(waitTime);
+            }
+        }
+
+        await f();
+    }
+
+    private async Task<T> RetryReturnTGeneric<T>(Func<Task<T>> f, int retryTimes = 5, int waitTime= 1000){
+        for (int i = 0; i < retryTimes-1; i++){
+            try{
+                return await f();
+            }
+            catch (Exception ex){
+                Console.WriteLine(ex.Message);
+                text += $"({i+1}) {ex.Message}\r\n";
+                await InvokeAsync(() => StateHasChanged());
+                await Task.Delay(waitTime);
+            }
+        }
+
+        return await f();
+    }
+        
+}
+
+
