@@ -1,0 +1,120 @@
+﻿@page "/TaskCompletionSource"
+@using Concurrency.Data;
+@inject IConfiguration Config;
+
+<style>
+.input-group{
+    height:180px;
+    margin: .4rem 0;
+    }
+</style>
+
+<div class="card-body">
+    <h1>TaskCompletionSource</h1>
+    <EditForm OnValidSubmit="@HandleValidSubmit" EditContext="@_editContext">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <div class="form-group">
+        <label for="typeInput">Select Task Status</label>
+        <InputSelect class="form-control" id="typeInput" @bind-Value="taskModel.TaskResult">
+                <option>Select...</option>
+                <optgroup label="normal">
+                    <option value="@(TaskResult.TaskCompleted)">@TaskResult.TaskCompleted.GetDisplayName()</option>
+                </optgroup>
+                <optgroup label="with issue">
+                    <option value="@(TaskResult.TaskCancelled)"> @TaskResult.TaskCancelled.GetDisplayName()</option>
+                    <option value="@(TaskResult.TaskError)"> @TaskResult.TaskError.GetDisplayName()</option>
+                </optgroup>
+        </InputSelect>
+    </div>
+    </EditForm>
+
+
+    <button class="btn btn-primary" @onclick="HandleClick" disabled="@isInvalidForm">Validate</button>
+
+    <div class="input-group">
+        <textarea class="form-control" aria-label="With textarea">@text</textarea>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private string apiURL = "";
+    public HttpClient httpClient = new();
+    private EditContext? _editContext;
+    private TaskModel taskModel = new TaskModel();
+    private bool isInvalidForm = true;
+    protected override void OnInitialized()
+    {
+        HandleValidationRequested();
+    }
+    private void HandleValidationRequested()
+    {
+        _editContext = new EditContext(taskModel);
+         isInvalidForm = true;
+        _editContext.OnFieldChanged +=(x, y) => 
+        {
+            isInvalidForm = !_editContext.Validate();
+            
+        };
+    }
+    public void HandleValidSubmit()
+    {
+        HandleValidationRequested();
+    }
+    protected override void OnParametersSet(){
+        apiURL = Config.GetValue<string>("apiURL");
+    }
+
+    private async Task HandleClick(){
+        text = "";
+        imageHidden = false;
+        
+        try{
+            Task task = EvaluateValue(taskModel.TaskResult );
+            
+            text += $"begin\r\n";
+            text += $"STATUS: {task.Status}\r\n";
+            text += $"Is Completed: {task.IsCompleted}\r\n";
+            text += $"Is Canceled: {task.IsCanceled}\r\n";
+            text += $"Is Faulted: {task.IsFaulted}\r\n";
+            text += $"end\r\n";
+
+            await task;
+        }
+        catch (Exception ex){
+            text += $"Exception: {ex.Message}";
+        }
+        finally{
+            imageHidden = true;
+            System.Console.WriteLine("end");
+            System.Console.WriteLine();
+            taskModel = new();
+            HandleValidationRequested();
+        }
+    }
+    
+    public Task EvaluateValue(TaskResult? value){
+        TaskCompletionSource<object> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        
+        if (value == TaskResult.TaskCompleted){
+            tcs.SetResult(TaskStatus.RanToCompletion);
+        }else if (value == TaskResult.TaskCancelled){
+            tcs.SetCanceled();
+        }else{
+            tcs.SetException(new ApplicationException($"Invalid value {value}"));
+        }
+        
+        return tcs.Task;
+    }
+}
+
+
