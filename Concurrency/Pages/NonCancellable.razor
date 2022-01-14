@@ -1,0 +1,114 @@
+﻿@page "/NonCancellable"
+@using Concurrency.Data;
+@inject IConfiguration Config;
+
+<style>
+.input-group{
+    height:180px;
+    margin: .4rem 0;
+    }
+</style>
+
+<div class="card-body">
+    <h1>Non Cancellable</h1>
+    <EditForm OnValidSubmit="@HandleValidSubmit" EditContext="@_editContext">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <div class="form-group">
+        <label for="typeInput">Select Milkshake Size</label>
+        <InputSelect class="form-control" id="typeInput" @bind-Value="milkshakeModel.MilkshakeSize">
+                <option>Select...</option>
+                    <option value="@(MilkshakeSize.Small)">@MilkshakeSize.Small.GetDisplayName()</option>
+                    <option value="@(MilkshakeSize.Medium)">@MilkshakeSize.Medium.GetDisplayName()</option>
+                    <option value="@(MilkshakeSize.Large)">@MilkshakeSize.Large.GetDisplayName()</option>
+        </InputSelect>
+    </div>
+    </EditForm>
+
+
+    <button class="btn btn-primary" @onclick="HandleClick" disabled="@isInvalidForm">Validate</button>
+    <button class="btn btn-secondary" @onclick="HandleCancel" disabled="@isInvalidForm">Cancel</button>
+
+    <div class="input-group">
+        <textarea class="form-control" aria-label="With textarea">@text</textarea>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private string apiURL = "";
+    public HttpClient httpClient = new();
+    private EditContext? _editContext;
+    private MilkShakeModel milkshakeModel = new();
+    private bool isInvalidForm = true;
+    private CancellationTokenSource cts = new();
+    protected override void OnInitialized()
+    {
+        HandleValidationRequested();
+    }
+    private void HandleValidationRequested()
+    {
+        _editContext = new EditContext(milkshakeModel);
+         isInvalidForm = true;
+        _editContext.OnFieldChanged +=(x, y) => 
+        {
+            isInvalidForm = !_editContext.Validate();
+            
+        };
+    }
+    public void HandleValidSubmit()
+    {
+        HandleValidationRequested();
+    }
+    protected override void OnParametersSet(){
+        apiURL = Config.GetValue<string>("apiURL");
+    }
+
+    private async Task HandleClick(){
+        text = "";
+        imageHidden = false;
+        
+        text += $"begin\r\n";
+        text += $"processing Milkshake: {milkshakeModel?.MilkshakeSize?.GetDescription()}\r\n";
+        cts = new();
+        try{
+            var result = await Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                return EvaluateValue(milkshakeModel?.MilkshakeSize);
+            }).WithCancellation(cts.Token);
+            
+            
+            text += $"Result: {result.Status}\r\n";
+        }
+        catch (Exception ex){
+            text += $"Exception: {ex.Message}\r\n";
+        }
+        finally{
+            imageHidden = true;
+            text += $"end\r\n";
+            milkshakeModel = new();
+            HandleValidationRequested();
+            cts.Dispose();
+        }
+    }
+    private void HandleCancel() 
+    {
+        cts.Cancel();
+    }
+    public Task EvaluateValue(MilkshakeSize? value){
+        TaskCompletionSource<object> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        tcs.SetResult(TaskStatus.RanToCompletion);
+        return tcs.Task;
+    }
+}
+
+
