@@ -1,0 +1,36 @@
+﻿@page "/IenumerableYield"
+
+<PageTitle>IEnumerable & Yield</PageTitle>
+
+<h1>&lt;IEnumerable & Yield&gt;</h1>
+
+<button class="btn btn-primary" @onclick="HandleGenerateNames">Click me</button>
+
+@* <div class="input-group">
+    <textarea class="form-control" aria-label="With textarea">@text</textarea>
+</div> *@
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private async Task HandleGenerateNames(){
+        imageHidden = false;
+
+        foreach (var name in GenerateNamesYield()){
+            Console.WriteLine($"{name}");
+        }
+
+        imageHidden = true;
+    }
+
+    private IEnumerable<string> GenerateNamesYield(){
+        yield return "Felipe";
+        Thread.Sleep(3000);
+        yield return "Claudia";
+    }
+}
