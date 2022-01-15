@@ -18,7 +18,7 @@
 
 @code {
     private bool imageHidden = true;
-    private async Task HandleGenerateNames(){
+    private void HandleGenerateNames(){
         imageHidden = false;
 
         foreach (var name in GenerateNamesYield()){
