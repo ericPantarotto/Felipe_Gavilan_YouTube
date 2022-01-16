@@ -111,6 +111,43 @@
                 "/consoleloggerparameters:NoSummary"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "builAntiPatternAsync",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/AntiPatternAsync/AntiPatternAsync.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "publishAntiPatternAsync",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "${workspaceFolder}/AntiPatternAsync/AntiPatternAsync.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "watchAsyncStreams",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "watch",
+                "run",
+                "${workspaceFolder}/AntiPatternAsync/AntiPatternAsync.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
         }
     ]
 }

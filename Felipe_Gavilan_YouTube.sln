@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConcurrencyTest", "Concurre
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AsynchronousStreams", "AsynchronousStreams\AsynchronousStreams.csproj", "{8D1013D7-B77C-4E37-B4E8-6D0B6D0E55E9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AntiPatternAsync", "AntiPatternAsync\AntiPatternAsync.csproj", "{6B587B89-863E-4545-8459-B660ECAC9F64}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,5 +38,9 @@ Global
 		{8D1013D7-B77C-4E37-B4E8-6D0B6D0E55E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8D1013D7-B77C-4E37-B4E8-6D0B6D0E55E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8D1013D7-B77C-4E37-B4E8-6D0B6D0E55E9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6B587B89-863E-4545-8459-B660ECAC9F64}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6B587B89-863E-4545-8459-B660ECAC9F64}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6B587B89-863E-4545-8459-B660ECAC9F64}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6B587B89-863E-4545-8459-B660ECAC9F64}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
