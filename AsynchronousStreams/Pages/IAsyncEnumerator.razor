@@ -1,0 +1,73 @@
+﻿@using System.Runtime.CompilerServices;
+@page "/IAsyncEnumerator"
+
+<PageTitle>IAsyncEnumerator</PageTitle>
+
+<h1>IAsyncEnumerator</h1>
+
+<button class="btn btn-primary" @onclick="HandleGenerateNames">Click me</button>
+<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
+
+<div class="input-group">
+    <textarea class="form-control" aria-label="With textarea">@text</textarea>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private string text  = "";
+    private CancellationTokenSource? cts;
+    private async Task HandleGenerateNames(){
+        imageHidden = false;
+        text  = "";
+        cts = new();
+        
+        try{
+            var enumerables = GenerateNamesYield();
+            await ProcessNames(enumerables);
+        }
+        catch (OperationCanceledException ex ){
+            text+= $"{ex.Message}\r\n";
+        }
+        finally{
+            cts.Dispose();
+        }
+
+        imageHidden = true;
+    }
+    private void HandleCancel(){
+        cts?.Cancel();
+    }
+
+    private async IAsyncEnumerable<string> GenerateNamesYield(
+        [EnumeratorCancellation] CancellationToken token= default){
+        yield return "Felipe";
+        await Task.Delay(3000, token);
+        yield return "Claudia";
+        await Task.Delay(3000, token);
+        yield return "Antonio";
+    }
+
+    private async Task ProcessNames(IAsyncEnumerable<string> namesEnumerable){
+        cts = new CancellationTokenSource();
+        
+        await foreach (var name in namesEnumerable.WithCancellation(cts.Token)){
+            Console.WriteLine($"{name}");
+            text += $"{name}\r\n";
+            await InvokeAsync(() => StateHasChanged());
+        }
+    }
+}
+
+
+<style>
+.input-group{
+    height:180px;
+    margin: .4rem 0;
+    }
+</style>
