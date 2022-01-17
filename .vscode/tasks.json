@@ -113,7 +113,7 @@
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "builAntiPatternAsync",
+            "label": "buildAntiPatternAsync",
             "command": "dotnet",
             "type": "process",
             "args": [

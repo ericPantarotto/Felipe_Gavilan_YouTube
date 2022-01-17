@@ -1,0 +1,62 @@
+﻿@using System.Runtime.CompilerServices;
+@page "/SyncOverAsync"
+
+<PageTitle>SyncOverAsync</PageTitle>
+
+<h1>SyncOverAsync</h1>
+
+<button class="btn btn-primary" @onclick="HandleGenerateNames">Click me</button>
+
+<div class="input-group">
+    <textarea class="form-control" aria-label="With textarea">@text</textarea>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private string text  = "";
+    private async Task HandleGenerateNames(){
+        imageHidden = false;
+        text  = "";
+        
+        try{
+            await Task.Delay(1);
+            //FIXME: This creates a deadlock
+            //string result = GetValue().Result;
+            
+            //HACK: Optimal solution
+            string result = await GetValue();
+            
+            
+            
+            text+=$"{result}";
+        }
+        catch (OperationCanceledException ex ){
+            text+= $"{ex.Message}\r\n";
+        }
+        finally{
+            imageHidden = true;    
+        }
+    }
+    private async Task<string> GetValue(){
+        await Task.Delay(TimeSpan.FromSeconds(3));
+        
+        //HACK: (Sub-optimal) without await, but we are still blocking the UI thread
+        //await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+        
+        return "Felipe";
+    }
+}
+
+
+<style>
+.input-group{
+    height:180px;
+    margin: .4rem 0;
+    }
+</style>
