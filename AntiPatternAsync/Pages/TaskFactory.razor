@@ -1,0 +1,67 @@
+﻿@using System.Runtime.CompilerServices;
+@page "/TaskFactory"
+
+<PageTitle>TaskFactory</PageTitle>
+
+<h1>Task Factory</h1>
+
+<button class="btn btn-primary" @onclick="HandleGenerateNames">Click me</button>
+
+<div class="input-group">
+    <textarea class="form-control" aria-label="With textarea">@text</textarea>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private string text  = "";
+    private async Task HandleGenerateNames(){
+        imageHidden = false;
+        text  = "";
+        
+        //FIXME: StartNew below returns Task<Task<string>>
+        //Task<string> resultFactory = await Task.Factory.StartNew(async () =>
+        
+        //HACK: solution 1 - double await
+        @* string resultFactory = await await Task.Factory.StartNew(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1));
+            return "Completed";
+        }); *@
+        //HACK: solution 2 - unwrapp
+        string resultFactory = await Task.Factory.StartNew(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1));
+                return "Completed";
+            }, 
+            CancellationToken.None,
+            TaskCreationOptions.DenyChildAttach,
+            TaskScheduler.Default    
+        ).Unwrap();
+
+        string resultTaskRun = await Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1));
+            return "Completed";
+        });
+
+        text+=$"Result Factory: {resultFactory}\r\n";
+        text+="------\r\n";
+        text+=$"Result TaskRun: {resultTaskRun}\r\n";
+
+        imageHidden = true;
+    }
+}
+
+
+<style>
+.input-group{
+    height:180px;
+    margin: .4rem 0;
+    }
+</style>
