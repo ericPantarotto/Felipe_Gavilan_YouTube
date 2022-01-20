@@ -90,8 +90,8 @@
         DeleteFiles(destinationSequential);  
     }
     private async Task ProcessImage(string directorio, ImageDTO imagen){
-        var response = await httpClient!.GetAsync(imagen.URL);
-        var content = await response.Content.ReadAsByteArrayAsync();
+        HttpResponseMessage response = await httpClient!.GetAsync(imagen.URL);
+        byte[] content = await response.Content.ReadAsByteArrayAsync();
 
         Bitmap bitmap;
         using (var ms = new MemoryStream(content)){
@@ -99,7 +99,7 @@
         }
 
         bitmap.RotateFlip(RotateFlipType.Rotate90FlipNone);
-        var destination = Path.Combine(directorio, imagen.Name);
+        string destination = Path.Combine(directorio, imagen.Name);
         bitmap.Save(destination);
     }
 

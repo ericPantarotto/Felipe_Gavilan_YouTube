@@ -1,0 +1,69 @@
+﻿@using System.IO
+@using System.Drawing
+@using System.Diagnostics;
+@using Parallelism.Data
+@page "/ParallelFor"
+
+<PageTitle>ParallelFor</PageTitle>
+
+<h1>Parallel For</h1>
+
+<button class="btn btn-primary" @onclick="HandleParallelFor">Click me</button>
+
+<div class="input-group">
+    <textarea class="form-control" aria-label="With textarea">@text</textarea>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private string text  = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        httpClient = new();
+
+    }
+    
+    private async Task HandleParallelFor(){
+        imageHidden = false;
+        text  = "";
+        int iterationNumber = 10;
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+
+        text += "Begin Sequential\r\n";
+
+        for (int i = 0; i < iterationNumber; i++)
+        {
+            text += $"{i}\r\n";
+        }
+        
+        double timeSequential = stopwatch.ElapsedMilliseconds;
+        text += $"Parallel - duration in seconds: {timeSequential}\r\n";
+
+        text += "Begin Parallel\r\n";
+        stopwatch = new();
+        Parallel.For(1,11, number => text += $"{number}\r\n");
+
+        double timeParallel = stopwatch.ElapsedMilliseconds;
+        text += $"Parallel - duration in seconds: {timeParallel}\r\n";
+
+        text +="End";
+        imageHidden = true;
+    }
+}
+
+
+<style>
+.input-group{
+    height:700px;
+    margin: .4rem 0;
+    }
+</style>
