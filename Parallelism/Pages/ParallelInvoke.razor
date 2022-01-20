@@ -2,11 +2,11 @@
 @using System.Drawing
 @using System.Diagnostics;
 @using Parallelism.Data
-@page "/ParallelForEach"
+@page "/ParallelInvoke"
 
-<PageTitle>ParallelForEach</PageTitle>
+<PageTitle>ParallelInvoke</PageTitle>
 
-<h1>Parallel ForEach</h1>
+<h1>Parallel Invoke</h1>
 
 <button class="btn btn-primary" @onclick="HandleGenerateNames">Click me</button>
 
@@ -35,37 +35,51 @@
         imageHidden = false;
         text  = "";
         
+        // Preparing code for transforming images
         string currentDirectory = AppDomain.CurrentDomain.BaseDirectory;
         string originFolder = Path.Combine(currentDirectory, @"images\result-sequential");
         string destinationSequential = Path.Combine(currentDirectory, @"images\foreach-sequential");
         string destinationParallel = Path.Combine(currentDirectory, @"images\foreachresult-simultaneoous");
 
         PrepareExecution(destinationParallel, destinationSequential);
-        text += "Begin Seq\r\n";
 
         IEnumerable<string> files = Directory.EnumerateFiles(originFolder);
+        
+        // Preparing code for matrices
+        int columnsMatrixA = 208;
+        int rows = 1240;
+        int columnsMatrixB = 750;
 
-        //Sequential
+        double[,] matrixA = Matrices.InitializeMatrix(rows,columnsMatrixA);
+        double[,] matrixB = Matrices.InitializeMatrix(columnsMatrixA,columnsMatrixB);
+        var result = new double [rows,columnsMatrixB];
+        //var resultParallel = new double [rows,columnsMatrixB];
+
+        Action multiplyMatrices = () => Matrices.MultiplyMatricesSequential(matrixA, matrixB, result);
+        Action transformImages = () =>
+        {
+            foreach (var file in files){
+                FlipImage(file, destinationSequential);
+            }
+        };
+        
+        //Sequential algorithm
+        text += "Begin Seq\r\n";
         Stopwatch stopwatch = new();
         stopwatch.Start();
 
-        // Sequential algorithm
-        foreach (var file in files)
-        {
-            FlipImage(file, destinationSequential);
-        }
-                
+        multiplyMatrices();
+        transformImages();
+
         double sequentialTime = stopwatch.ElapsedMilliseconds / 1000.0;
 
         text += $"Sequential - duration in seconds: {sequentialTime}\r\n";
 
+        // Parallel algorithm
         stopwatch.Restart();
         text += "Begin //\r\n";
-        // Parallel algorithm
-        Parallel.ForEach(files, file =>
-        {
-            FlipImage(file, destinationParallel);
-        });
+        
+        Parallel.Invoke(transformImages, multiplyMatrices);
 
         double timeParallel = stopwatch.ElapsedMilliseconds / 1000.0;
 
@@ -77,6 +91,8 @@
 
 
         imageHidden = true;
+
+        
     }
     private void PrepareExecution(string destinationParallel,
         string destinationSequential){
