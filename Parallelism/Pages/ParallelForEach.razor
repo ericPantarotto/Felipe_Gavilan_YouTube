@@ -1,0 +1,121 @@
+﻿@using System.IO
+@using System.Drawing
+@using System.Diagnostics;
+@using Parallelism.Data
+@page "/ParallelForEach"
+
+<PageTitle>ParallelForEach</PageTitle>
+
+<h1>Parallel ForEach</h1>
+
+<button class="btn btn-primary" @onclick="HandleGenerateNames">Click me</button>
+
+<div class="input-group">
+    <textarea class="form-control" aria-label="With textarea">@text</textarea>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private string text  = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        httpClient = new();
+
+    }
+    
+    private async Task HandleGenerateNames(){
+        imageHidden = false;
+        text  = "";
+        //int iterationNumber = 20;
+        
+        string currentDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        string originFolder = Path.Combine(currentDirectory, @"images\result-sequential");
+        string destinationSequential = Path.Combine(currentDirectory, @"images\foreach-sequential");
+        string destinationParallel = Path.Combine(currentDirectory, @"images\foreachresult-simultaneoous");
+
+        PrepareExecution(destinationParallel, destinationSequential);
+        text += "Begin Seq\r\n";
+
+        IEnumerable<string> files = Directory.EnumerateFiles(originFolder);
+
+        //Sequential
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+
+        // Sequential algorithm
+        foreach (var file in files)
+        {
+            FlipImage(file, destinationSequential);
+        }
+                
+        double sequentialTime = stopwatch.ElapsedMilliseconds / 1000.0;
+
+        text += $"Sequential - duration in seconds: {sequentialTime}\r\n";
+
+        stopwatch.Restart();
+        text += "Begin //\r\n";
+        // Parallel algorithm
+        Parallel.ForEach(files, file =>
+        {
+            FlipImage(file, destinationParallel);
+        });
+
+        double timeParallel = stopwatch.ElapsedMilliseconds / 1000.0;
+
+        text += $"Parallel - duration in seconds: {timeParallel}\r\n";
+
+        text += $"{Utils.WriteComparison(sequentialTime, timeParallel)}\r\n"; 
+
+        text +="End";
+
+
+        imageHidden = true;
+    }
+    private void PrepareExecution(string destinationParallel,
+        string destinationSequential){
+        if (!Directory.Exists(destinationParallel)){
+            Directory.CreateDirectory(destinationParallel);
+        }
+        if (!Directory.Exists(destinationSequential)){
+            Directory.CreateDirectory(destinationSequential);
+        }
+        if (!Directory.Exists(destinationParallel)){
+            Directory.CreateDirectory(destinationParallel);
+        }
+
+        DeleteFiles(destinationParallel);
+        DeleteFiles(destinationSequential);  
+    }
+    private void FlipImage(string file, string destinationDirectory)
+    {
+        using (var image = new Bitmap(file))
+        {
+            image.RotateFlip(RotateFlipType.Rotate90FlipNone);
+            var fileName = Path.GetFileName(file);
+            var destination = Path.Combine(destinationDirectory, fileName);
+            image.Save(destination);
+        }
+    }
+
+    private void DeleteFiles(string directory){
+        var files = Directory.EnumerateFiles(directory);
+        files.ToList().ForEach(f => File.Delete(f));
+    }
+    
+}
+
+
+<style>
+.input-group{
+    height:180px;
+    margin: .4rem 0;
+    }
+</style>
