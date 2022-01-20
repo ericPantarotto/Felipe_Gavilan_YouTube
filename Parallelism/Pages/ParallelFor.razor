@@ -31,32 +31,35 @@
 
     }
     
-    private async Task HandleParallelFor(){
+    private void HandleParallelFor(){
         imageHidden = false;
         text  = "";
-        int iterationNumber = 10;
+        int iterationNumber = 11;
         Stopwatch stopwatch = new();
         stopwatch.Start();
 
         text += "Begin Sequential\r\n";
 
-        for (int i = 0; i < iterationNumber; i++)
+        for (int i = 1; i < iterationNumber; i++)
         {
             text += $"{i}\r\n";
         }
         
         double timeSequential = stopwatch.ElapsedMilliseconds;
-        text += $"Parallel - duration in seconds: {timeSequential}\r\n";
+        text += $"Sequential - duration in seconds: {timeSequential}\r\n";
 
         text += "Begin Parallel\r\n";
         stopwatch = new();
         Parallel.For(1,11, number => text += $"{number}\r\n");
+        Parallel.For(1, 11, i => Console.WriteLine(i));
 
         double timeParallel = stopwatch.ElapsedMilliseconds;
         text += $"Parallel - duration in seconds: {timeParallel}\r\n";
 
         text +="End";
         imageHidden = true;
+
+        
     }
 }
 

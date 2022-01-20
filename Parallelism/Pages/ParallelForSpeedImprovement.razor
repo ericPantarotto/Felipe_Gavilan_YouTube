@@ -1,0 +1,85 @@
+﻿@using Parallelism.Data;
+@using System.Diagnostics;
+@page "/ParallelForSpeed"
+
+<PageTitle>ParallelForSpeed</PageTitle>
+
+<h1>Parallel For Speed Improvement</h1>
+
+<button class="btn btn-primary" @onclick="HandleParallelForSpeed">Click me</button>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+    
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-6">
+                    <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        httpClient = new();
+
+    }
+
+    private async Task HandleParallelForSpeed()
+    {
+        imageHidden = false;
+        text = "";
+        await InvokeAsync(() => StateHasChanged());
+        await Task.Delay(2000);
+        text += "Begin Sequential\r\n";
+            Stopwatch stopwatch = new();
+            stopwatch.Start();
+
+            int columnsMatrixA = 1100;
+            int rows = 1000;
+            int columnsMatrixB = 1750;
+
+            double[,] matrixA = Matrices.InitializeMatrix(rows,columnsMatrixA);
+            double[,] matrixB = Matrices.InitializeMatrix(columnsMatrixA,columnsMatrixB);
+            var result = new double [rows,columnsMatrixB];
+            var resultParallel = new double [rows,columnsMatrixB];
+
+            Matrices.MultiplyMatricesSequential(matrixA, matrixB, result);
+
+            double timeSequential = stopwatch.ElapsedMilliseconds / 1000;
+            text += $"Sequential - duration in seconds: {timeSequential}\r\n";
+
+            text += "Begin Parallel\r\n";
+            stopwatch.Restart();
+
+            await Task.Run(() => Matrices.MultiplyMatricesParallel(matrixA, matrixB, resultParallel));
+
+            double timeParallel = stopwatch.ElapsedMilliseconds /1000;
+            text += $"Parallel - duration in seconds: {timeParallel}\r\n";
+            text += Utils.WriteComparison(timeSequential, timeParallel);
+            text +="End";
+        imageHidden = true;
+    }
+}
+
+
+<style>
+    .input-group {
+        height: 700px;
+        margin: .4rem 0;
+    }
+</style>
