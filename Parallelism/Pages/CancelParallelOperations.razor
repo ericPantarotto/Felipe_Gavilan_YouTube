@@ -1,0 +1,97 @@
+﻿@using Parallelism.Data;
+@using System.Diagnostics;
+@page "/CancelParallelOperations"
+
+<PageTitle>CancelParallelOperations</PageTitle>
+
+<h1>CancelParallelOperations</h1>
+
+<button class="btn btn-primary" @onclick="HandleParallelForSpeed">Click me</button>
+<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+    
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-6">
+                    <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private HttpClient? httpClient;
+    private CancellationTokenSource? cts;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        httpClient = new();
+
+    }
+
+    private async Task HandleParallelForSpeed()
+    {
+        imageHidden = false;
+        text = "";
+        await InvokeAsync(() => StateHasChanged());
+        await Task.Delay(1000);
+
+        cts = new();
+
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+
+        int columnsMatrixA = 1100;
+        int rows = 1000;
+        int columnsMatrixB = 1750;
+
+        double[,] matrixA = Matrices.InitializeMatrix(rows,columnsMatrixA);
+        double[,] matrixB = Matrices.InitializeMatrix(columnsMatrixA,columnsMatrixB);
+        
+        var resultParallel = new double [rows,columnsMatrixB];
+        text += "Initialized\r\nBegin Parallel\r\n";
+        await InvokeAsync(() => StateHasChanged());
+        await Task.Delay(1000);
+        
+        try{
+            //cts.CancelAfter(1500);
+            await Task.Run(() => Matrices.MultiplyMatricesParallel(matrixA, matrixB, resultParallel, cts.Token ));
+            double timeParallel = stopwatch.ElapsedMilliseconds /1000;
+            text += $"Parallel - duration in seconds: {timeParallel}\r\n";
+        }
+        catch(OperationCanceledException){
+            text += "Operation was cancelled\r\nEnd";
+        }
+        finally{
+            text +="End";
+            imageHidden = true;
+            cts.Dispose(); 
+        }
+
+    }
+    private void HandleCancel() 
+    {
+        cts?.Cancel();
+    }
+
+}
+
+
+<style>
+    .input-group {
+        height: 700px;
+        margin: .4rem 0;
+    }
+</style>
