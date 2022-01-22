@@ -1,10 +1,10 @@
 ﻿@using Parallelism.Data;
 @using System.Diagnostics;
-@page "/Interlocked"
+@page "/LockOnlyOneThread"
 
-<PageTitle>Interlocked</PageTitle>
+<PageTitle>LockOnlyOneThread</PageTitle>
 
-<h1>Interlocked</h1>
+<h1>LockOnlyOneThread</h1>
 
 <button class="btn btn-primary" @onclick="HandleValid">Click me</button>
 <button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
@@ -34,40 +34,49 @@
     private HttpClient? httpClient;
     private CancellationTokenSource? cts;
 
-    protected override void OnParametersSet()
-    {
+    protected override void OnParametersSet(){
         base.OnParametersSet();
         httpClient = new();
-
     }
 
-    private async Task HandleValid()
-    {
+    private async Task HandleValid(){
         imageHidden = false;
-        text = "";
         
-        text = "Begin\r\n";
+        text += "Begin\r\n";
         await InvokeAsync(() => StateHasChanged());
         await Task.Delay(300);
 
-        int valueWithoutInterlocked = 0;
-        Parallel.For(0, 1000000, _ => valueWithoutInterlocked++);
+        int incrementValue = 0;
+        int sumValue = 0;
+ 
+        Parallel.For(0, 10_000, number => 
+        {
+            Interlocked.Increment(ref incrementValue);
+            Interlocked.Add(ref sumValue, incrementValue);
+        });
 
-        text+= $"Increment without interlocked: {valueWithoutInterlocked}\r\n";
-
-        int valueWithInterlocked = 0;
-        Parallel.For(0, 1000000, _ => Interlocked.Increment(ref valueWithInterlocked));
-
-        text+= $"Increment with interlocked: {valueWithInterlocked}\r\n";
+        text+= $"No lock: Increment value {incrementValue} - Sum Value {sumValue}\r\n";
         
+        //HACK: making use of a lock
+        int incrementValueLock = 0;
+        int sumValueLock = 0;
+        
+        Object mutex = new();
+        Parallel.For(0, 10_000, number => 
+        {
+            lock(mutex){
+                incrementValueLock++;
+                sumValueLock += incrementValueLock;
+            }
+        });
+        text+= $"No lock: Increment value {incrementValueLock} - Sum Value {sumValueLock}\r\n";
 
-        text +="End";
+        text +="End\r\n";
         imageHidden = true;
-    }
 
-    private void HandleCancel() 
-    {
-        cts?.Cancel();
+    }
+    private void HandleCancel() {
+        text = "";
     }
 
 }
