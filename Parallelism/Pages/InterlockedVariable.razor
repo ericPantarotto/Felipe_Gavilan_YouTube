@@ -1,0 +1,113 @@
+﻿@using Parallelism.Data;
+@using System.Diagnostics;
+@page "/Interlocked"
+
+<PageTitle>Interlocked</PageTitle>
+
+<h1>Interlocked</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+    
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-6">
+                    <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private HttpClient? httpClient;
+    private CancellationTokenSource? cts;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        httpClient = new();
+
+    }
+
+    private async Task HandleValid()
+    {
+        imageHidden = false;
+        text = "";
+        
+        text = "Begin\r\n";
+        await InvokeAsync(() => StateHasChanged());
+        await Task.Delay(300);
+
+        int valueWithoutInterlocked = 0;
+        Parallel.For(0, 1000000, _ => valueWithoutInterlocked++);
+
+        text+= $"Increment without interlocked: {valueWithoutInterlocked}\r\n";
+
+        int valueWithInterlocked = 0;
+        Parallel.For(0, 1000000, _ => Interlocked.Increment(ref valueWithInterlocked));
+
+        text+= $"Increment with interlocked: {valueWithInterlocked}\r\n";
+        
+
+        text +="End";
+        imageHidden = true;
+
+    }
+
+    private async Task DoMatricesTest(int maxDegreeOfParallelism){
+        cts = new();
+
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+
+        int columnsMatrixA = 1204;
+        int rows = 650;
+        int columnsMatrixB = 925;
+
+        double[,] matrixA = Matrices.InitializeMatrix(rows,columnsMatrixA);
+        double[,] matrixB = Matrices.InitializeMatrix(columnsMatrixA,columnsMatrixB);
+        
+        var resultParallel = new double [rows,columnsMatrixB];
+        text += $"Initialized - Begin Parallel ({maxDegreeOfParallelism} degrees) \r\n";
+        await InvokeAsync(() => StateHasChanged());
+        await Task.Delay(1000);
+        
+        try{
+            await Task.Run(() => Matrices.MultiplyMatricesParallel(matrixA, matrixB, resultParallel, cts.Token, maxDegreeOfParallelism ));
+            double timeParallel = stopwatch.ElapsedMilliseconds /1000.0;
+            text += $"Parallel with {maxDegreeOfParallelism} degrees  - duration in seconds: {timeParallel}\r\n";
+        }
+        catch(OperationCanceledException){
+            text += "Operation was cancelled\r\n";
+            imageHidden = true;
+        }
+        finally{
+            cts.Dispose(); 
+        }
+    }
+    private void HandleCancel() 
+    {
+        cts?.Cancel();
+    }
+
+}
+
+
+<style>
+    .input-group {
+        height: 700px;
+        margin: .4rem 0;
+    }
+</style>
