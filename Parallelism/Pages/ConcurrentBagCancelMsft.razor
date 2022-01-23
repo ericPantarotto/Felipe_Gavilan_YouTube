@@ -1,0 +1,207 @@
+﻿@using System;
+@using System.Collections.Concurrent;
+@using System.Collections.Generic;
+@using System.Threading.Tasks;
+@using System.Linq;
+@page "/ConcBagCancel"
+
+<PageTitle>Cancel Concurrent Bag</PageTitle>
+
+<h1>Cancel Concurrent Bag</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+    
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-6">
+                    <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    //NOTE: https://docs.microsoft.com/en-us/dotnet/standard/parallel-programming/how-to-cancel-a-task-and-its-children
+
+    private bool imageHidden = true;
+    private static string text = "";
+    private HttpClient? httpClient;
+    private CancellationTokenSource? tokenSource;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        httpClient = new();
+
+    }
+
+    private async Task HandleValid()
+    {
+        imageHidden = false;
+        text = "";
+        
+        text = "Begin\r\n";
+        await Task.Delay(300);
+        
+         // Add to ConcurrentBag concurrently
+        //var tokenSource = new CancellationTokenSource();
+        tokenSource = new();
+        var token = tokenSource.Token;
+
+        // Store references to the tasks so that we can wait on them and
+        // observe their status after cancellation.
+        Task<Guid> t;
+        Task<string> tGlobal;
+        var tasks = new ConcurrentBag<Task<Guid>>();
+        var tasksGlobal    = new ConcurrentBag<Task<string>>();
+        //var tasks = new ConcurrentBag<Task>();
+
+        //Console.WriteLine("Press any key to begin tasks...");
+        //Console.ReadKey(true);
+        //Console.WriteLine("To terminate the example, press 'c' to cancel and exit...");
+        //Console.WriteLine();
+
+        // Request cancellation of a single task when the token source is canceled.
+        // Pass the token to the user delegate, and also to the task so it can
+        // handle the exception correctly.
+        t = Task.Run(() => DoSomeWork(1, token), token);
+        Console.WriteLine("Task {0} executing", t.Id);
+        
+        tasks.Add(t);
+
+        // Request cancellation of a task and its children. Note the token is passed
+        // to (1) the user delegate and (2) as the second argument to Task.Run, so
+        // that the task instance can correctly handle the OperationCanceledException.
+        tGlobal = Task.Run(() =>
+        {
+            // Create some cancelable child tasks.
+            Task<Guid> tc;
+            for (int i = 3; i <= 4; i++)
+            {
+                // For each child task, pass the same token
+                // to each user delegate and to Task.Run.
+                
+                tc = Task.Run(() => DoSomeWork(i, token), token);
+                Console.WriteLine("Task {0} executing", tc.Id);
+                tasks.Add(tc);
+                
+                
+                // Pass the same token again to do work on the parent task.
+                // All will be signaled by the call to tokenSource.Cancel below.
+                tc = Task.Run(() => DoSomeWork(2, token), token);
+                Console.WriteLine("Task {0} executing", tc.Id);
+                tasks.Add(tc);
+                
+            }
+            return "Task Global";
+        }, token);
+
+        tasksGlobal.Add(tGlobal);
+
+        // Request cancellation from the UI thread.
+        //char ch = Console.ReadKey().KeyChar;
+        //if (ch == 'c' || ch == 'C')
+        //{
+        //    tokenSource.Cancel();
+        //    Console.WriteLine("\nTask cancellation requested.");
+        //    text += String.Format($"Task cancellation requested.\r\n");
+            // Optional: Observe the change in the Status property on the task.
+            // It is not necessary to wait on tasks that have canceled. However,
+            // if you do wait, you must enclose the call in a try-catch block to
+            // catch the TaskCanceledExceptions that are thrown. If you do
+            // not wait, no exception is thrown if the token that was passed to the
+            // Task.Run method is the same token that requested the cancellation.
+        //}
+
+        try
+        {
+            await Task.WhenAll(tasks.ToArray());
+            
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine($"\n{nameof(OperationCanceledException)} thrown\n");
+            text += $"\n{nameof(OperationCanceledException)} thrown\n";
+            Console.WriteLine("\nTask cancellation requested.");
+            text += $"Task cancellation requested.\r\n";
+        }
+        finally
+        {
+            tokenSource.Dispose();
+        }
+
+        // Display status of all tasks.
+        await Task.Delay(1000);
+        foreach (var task in tasks){
+            Console.WriteLine("Task {0} with thread {1} status is now {2}", task.Result, task.Id, task.Status);
+        }
+
+        foreach (var task in tasksGlobal){
+            Console.WriteLine("{0} with thread {1} status is now {2}", task.Result, task.Id, task.Status);
+        }
+
+        text +=$"{tasks.Count} tasks in the bag have been processed\r\n";    
+        text +="End";
+        imageHidden = true;
+    }
+
+    
+    private static Guid DoSomeWork(int taskNum, CancellationToken ct)
+    {
+        // Was cancellation already requested?
+        if (ct.IsCancellationRequested)
+        {
+            Console.WriteLine("Task {0} was cancelled before it got started.", taskNum);
+            ct.ThrowIfCancellationRequested();
+        }
+
+        int maxIterations = 50;
+
+        // NOTE!!! A "TaskCanceledException was unhandled
+        // by user code" error will be raised here if "Just My Code"
+        // is enabled on your computer. On Express editions JMC is
+        // enabled and cannot be disabled. The exception is benign.
+        // Just press F5 to continue executing your code.
+        for (int i = 0; i <= maxIterations; i++)
+        {
+            // Do a bit of work. Not too much.
+            var sw = new SpinWait();
+            for (int j = 0; j <= 100; j++){
+                sw.SpinOnce();
+            }
+
+            if (ct.IsCancellationRequested)
+            {
+                Console.WriteLine("Task {0} cancelled", taskNum);
+                ct.ThrowIfCancellationRequested();
+            }
+        }
+        var g  =Guid.NewGuid();
+        
+        Console.WriteLine($"Task {g} was processed\r\n");
+        return g;
+    }
+    private void HandleCancel() 
+    {
+        tokenSource?.Cancel();
+    }
+}
+
+
+<style>
+    .input-group {
+        height: 700px;
+        margin: .4rem 0;
+    }
+</style>
