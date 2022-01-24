@@ -6,8 +6,8 @@ namespace Parallelism.Data
     public static class Matrices
     {
 
-        static RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
-        //static RandomNumberGenerator rng = RandomNumberGenerator.Create();
+        //static RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+        static RandomNumberGenerator rng = RandomNumberGenerator.Create();
 
         [ThreadStatic]
         static Random? random;
@@ -19,17 +19,17 @@ namespace Parallelism.Data
             //for (int i = 0; i < rows; i++)
             Parallel.For(0, rows, i =>
             {
-                if (random == null)
-                {
-                   var buffer = new byte[4];
-                   rng.GetBytes(buffer);
-                   random = new Random(BitConverter.ToInt32(buffer, 0));
-                }
+                // if (random == null)
+                // {
+                //    var buffer = new byte[4];
+                //    rng.GetBytes(buffer);
+                //    random = new Random(BitConverter.ToInt32(buffer, 0));
+                // }
                 
                 //using var rng = RandomNumberGenerator.Create();
-                // var intBuffer = new byte[sizeof(int)];
-                // rng.GetBytes(intBuffer);
-                // random = new Random(BitConverter.ToInt32(intBuffer, 0));
+                var intBuffer = new byte[sizeof(int)];
+                rng.GetBytes(intBuffer);
+                random = new Random(BitConverter.ToInt32(intBuffer, 0));
 
                 for (int j = 0; j < columns; j++)
                 {
