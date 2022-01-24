@@ -1,0 +1,99 @@
+﻿@using Parallelism.Data;
+@using System.Diagnostics;
+@page "/PlinqAggregate"
+
+<PageTitle>PlinqAggregate</PageTitle>
+
+<h1>PlinqAggregate</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+    
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-6">
+                    <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        httpClient = new();
+    }
+
+    private async Task HandleValid(){
+        imageHidden = false;
+        text = "";
+        text += "Begin\r\n";
+        await InvokeAsync(() => StateHasChanged());
+        await Task.Delay(300);
+
+        int ceilingNumber = 10000;
+        IEnumerable<int> source = Enumerable.Range(1,ceilingNumber);
+    
+        //making it parallel using Plinq - simple aggregation
+
+        int sum = source.AsParallel().Sum();
+        text += $"\r\nSimple arithmetic sum of {ceilingNumber} using PLINQ: {sum}";
+        double avg = source.AsParallel().Average();
+        text += $"\r\nSimple average of {ceilingNumber} suite  using PLINQ: {avg}";
+        
+
+        //complex matrices computation
+        Stopwatch stopwatch = new();
+        
+        IEnumerable<double[,]> matrices = Enumerable.Range( 1,1000).Select(x => Matrices.InitializeMatrix(1000,1000));
+        
+        text += $"\r\nMatrices generated\r\n";
+        await InvokeAsync(() => StateHasChanged());
+        
+        stopwatch.Start();
+        double[,] sumMatricesSequential = matrices.Aggregate(Matrices.AddMatricesSequential);
+        double sequentialTime = stopwatch.ElapsedMilliseconds / 1000.0;
+        text += $"Sequential - duration in seconds: {sequentialTime}\r\n";
+        await InvokeAsync(() => StateHasChanged());
+
+        stopwatch.Restart();
+        double[,] sumMatricesSParallel = matrices.AsParallel()
+            .Aggregate(Matrices.AddMatricesSequential);
+        double parallelTime = stopwatch.ElapsedMilliseconds / 1000.0;
+        text += $"Sequential - duration in seconds: {parallelTime}\r\n";
+        await InvokeAsync(() => StateHasChanged());
+
+        text += Utils.WriteComparison(sequentialTime,parallelTime);
+        text +="\r\nEnd\r\n";
+        imageHidden = true;
+
+        
+
+    }
+    private void HandleCancel() {
+        text = "";
+    }
+
+}
+
+
+<style>
+    .input-group {
+        height: 700px;
+        margin: .4rem 0;
+    }
+</style>
