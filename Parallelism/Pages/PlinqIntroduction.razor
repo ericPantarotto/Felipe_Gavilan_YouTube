@@ -1,0 +1,92 @@
+﻿
+@page "/PlinqIntroduction"
+
+<PageTitle>PlinqIntroduction</PageTitle>
+
+<h1>PlinqIntroduction</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+    
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-6">
+                    <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        httpClient = new();
+    }
+
+    private async Task HandleValid(){
+        imageHidden = false;
+        text = "";
+        text += "Begin\r\n";
+        await InvokeAsync(() => StateHasChanged());
+        await Task.Delay(300);
+
+        IEnumerable<int> source = Enumerable.Range(1,20);
+        
+        //using Linq
+        text += "List even nb using Linq: ";
+        
+        source.Where(x => x % 2 == 0)
+            .ToList()
+            .ForEach(x => {
+                string temp = x == source.Last() ? x.ToString() : $"{x} -";
+                text += temp;
+            });
+        
+
+        //making it parallel using Plinq
+        CancellationTokenSource cts = new();
+        
+        text += "\r\nList even nb using PLINQ: ";
+        string temp = "";
+        source.AsParallel()
+            //.AsOrdered()
+            .WithDegreeOfParallelism(Convert.ToInt32(Math.Ceiling((Environment.ProcessorCount * 0.75))))
+            .WithCancellation(cts.Token)
+            .Where(x => x % 2 == 0)
+            .ToList()
+            .ForEach(x => temp += $"{x} -");
+        temp = $"{temp.Remove(temp.Length - 1)}\r\n";
+        text += temp;
+        text +="End\r\n";
+        imageHidden = true;
+
+
+
+    }
+    private void HandleCancel() {
+        text = "";
+    }
+
+}
+
+
+<style>
+    .input-group {
+        height: 700px;
+        margin: .4rem 0;
+    }
+</style>
