@@ -1,0 +1,90 @@
+﻿@using Parallelism.Data;
+@using System.Linq;
+
+@page "/PlinqForAll"
+
+<PageTitle>PlinqForAll</PageTitle>
+
+<h1>PlinqForAll</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+    
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-6">
+                    <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        httpClient = new();
+    }
+
+    private async Task HandleValid(){
+        imageHidden = false;
+        text = "";
+        text += "Begin simple ForEach\r\n";
+        await InvokeAsync(() => StateHasChanged());
+        await Task.Delay(300);
+
+        Matrices.resetMatriceNumber();
+        IEnumerable<double[,]>  parallelQuery = Enumerable.Range(1,10).AsParallel()
+            .WithDegreeOfParallelism(2)
+            .Select(_ => Matrices.InitializeMatrix(100,100));
+        
+        foreach (var matrix in parallelQuery)
+        {
+            text += $"{matrix[0,0]}\r\n";
+            await InvokeAsync(() => StateHasChanged());
+        }
+        
+        //ForAll
+        text += "Begin ForAll\r\n";
+        ParallelQuery<double[,]> parallelQueryForAll = Enumerable.Range(1,10).AsParallel()
+            .WithDegreeOfParallelism(2)
+            .Select(_ => Matrices.InitializeMatrix(100,100));
+
+        parallelQueryForAll.ForAll(async matrix => 
+        {
+            text += $"{matrix[0,0]}\r\n";
+            await InvokeAsync(() => StateHasChanged());
+        });
+        
+        text +="\r\nEnd\r\n";
+        imageHidden = true;
+
+        
+
+    }
+    private void HandleCancel() {
+        text = "";
+    }
+
+}
+
+
+<style>
+    .input-group {
+        height: 700px;
+        margin: .4rem 0;
+    }
+</style>

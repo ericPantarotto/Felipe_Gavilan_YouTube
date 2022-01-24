@@ -59,7 +59,7 @@
         //complex matrices computation
         Stopwatch stopwatch = new();
         
-        IEnumerable<double[,]> matrices = Enumerable.Range( 1,1000).Select(x => Matrices.InitializeMatrix(1000,1000));
+        IEnumerable<double[,]> matrices = Enumerable.Range( 1,1000).Select(_ => Matrices.InitializeMatrix(1000,1000));
         
         text += $"\r\nMatrices generated\r\n";
         await InvokeAsync(() => StateHasChanged());

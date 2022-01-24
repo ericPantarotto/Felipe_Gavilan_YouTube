@@ -8,12 +8,21 @@ namespace Parallelism.Data
 
         //static RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
         static RandomNumberGenerator rng = RandomNumberGenerator.Create();
-
+        static int matriceNumber  = 1;
+        //static int matriceNumber = 1;
         [ThreadStatic]
         static Random? random;
 
+        //HACK: making sure that number restart at 1
+        public static void resetMatriceNumber()
+        {
+            matriceNumber = 1;
+        }
         public static double[,] InitializeMatrix(int rows, int columns)
         {
+            //NOTE: For visualization purpose
+            Thread.Sleep(2000);
+
             double[,] matrix = new double[rows, columns];
 
             //for (int i = 0; i < rows; i++)
@@ -36,6 +45,10 @@ namespace Parallelism.Data
                     matrix[i, j] = random.Next(100);
                 }
             });
+            
+            
+            Console.WriteLine($"processed matrice {matriceNumber}");
+            Interlocked.Increment(ref matriceNumber);
 
             return matrix;
         }
