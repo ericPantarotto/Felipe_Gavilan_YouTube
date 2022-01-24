@@ -49,8 +49,13 @@
         //Sequential
         Stopwatch stopwatch = new();
         stopwatch.Start();
-
-        images.ToList().ForEach(async img => await ProcessImage(destinationSequential, img));
+        
+        foreach (var img in images){
+            await ProcessImage(destinationSequential, img);
+        }
+        
+        //FIXME: Linq will not process await operator
+        //images.ToList().ForEach(async img => await ProcessImage(destinationSequential, img));
                 
         double sequentialTime = stopwatch.ElapsedMilliseconds / 1000.0;
 
@@ -89,6 +94,7 @@
         DeleteFiles(destinationParallel);
         DeleteFiles(destinationSequential);  
     }
+    
     private async Task ProcessImage(string directorio, ImageDTO imagen){
         HttpResponseMessage response = await httpClient!.GetAsync(imagen.URL);
         byte[] content = await response.Content.ReadAsByteArrayAsync();
