@@ -11,4 +11,8 @@
     <PackageReference Include="System.Linq.Parallel" Version="4.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ConcurrencyApi\ConcurrencyApi.csproj" />
+  </ItemGroup>
+
 </Project>

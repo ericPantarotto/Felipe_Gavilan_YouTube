@@ -1,0 +1,119 @@
+﻿
+@using ConcurrencyApi.Helpers;
+@using System.Text.RegularExpressions;
+@using System.Diagnostics;
+@using Parallelism.Data;
+@page "/ParallelCards"
+
+<PageTitle>ParallelCards</PageTitle>
+
+<h1>ParallelCards</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+@* /<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button> *@
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+    
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-6">
+                    <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private string text = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        httpClient = new();
+    }
+
+    private async Task HandleValid()
+    {
+        imageHidden = false;
+        text = "";
+        text += "Begin \r\n";
+        await InvokeAsync(() => StateHasChanged());
+        await Task.Delay(300);
+
+        int nbCards = 100   ;
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+
+        @* List<Task<Card>> tasks = Enumerable.Range(1,nbCards).Select(async x => 
+        {
+            return await CreateCard();
+        }).ToList();
+        
+        await Task.WhenAll(tasks); *@
+
+        @* foreach (var item in tasks)
+        {
+            Console.WriteLine(item.Result.CardName) ;
+        } *@
+
+        //TODO: implement semaphore + cancellation token 
+        try{
+            var result = await ProcessCards(nbCards);
+            
+            double sequentialTime = stopwatch.ElapsedMilliseconds / 1000.0;
+            text += $"Sequential - duration in seconds: {sequentialTime}\r\n";
+            await InvokeAsync(() => StateHasChanged());
+                
+            foreach (var item in result){
+                item.Result.ThreadId = item.Id;
+                Console.WriteLine($"{item.Result.CardName}/{item.Result.ThreadId}") ;
+            }
+        }
+        catch (Exception){
+            throw;
+        }
+        
+        text +="\r\nEnd\r\n";
+        imageHidden = true;
+
+    }
+
+    private async Task<List<Task<Card>>> ProcessCards(int nbCards){
+        var tasks = Enumerable.Range(1,nbCards).Select(async x => 
+        {
+            return await CreateCard();
+        }).ToList();
+        
+        await Task.WhenAll(tasks);
+        
+        return tasks;
+    }
+
+    private async Task<Card> CreateCard(){
+        await Task.Delay(2000);
+
+        double randomValue = RandomNumberGenNew.NextDouble();
+        string valueString = (randomValue * 100000000).ToString(); 
+        string cardName = String.Join("_",Regex.Matches(valueString, @"\d{4}").Cast<Match>());
+        
+        return new Card(){
+            CardName = cardName
+        };
+    }
+}
+
+
+<style>
+    .input-group {
+        height: 700px;
+        margin: .4rem 0;
+    }
+</style>
