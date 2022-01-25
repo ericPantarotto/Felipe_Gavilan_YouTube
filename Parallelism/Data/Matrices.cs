@@ -18,11 +18,34 @@ namespace Parallelism.Data
         {
             matriceNumber = 1;
         }
-        public static double[,] InitializeMatrix(int rows, int columns)
+        public static double[,] InitializeMatrixForAll(int rows, int columns)
         {
             //NOTE: For visualization purpose
             Thread.Sleep(2000);
 
+            double[,] matrix = new double[rows, columns];
+
+            //for (int i = 0; i < rows; i++)
+            Parallel.For(0, rows, i =>
+            {   
+                //using var rng = RandomNumberGenerator.Create();
+                var intBuffer = new byte[sizeof(int)];
+                rng.GetBytes(intBuffer);
+                random = new Random(BitConverter.ToInt32(intBuffer, 0));
+
+                for (int j = 0; j < columns; j++)
+                {
+                    matrix[i, j] = random.Next(100);
+                }
+            });
+            
+            Console.WriteLine($"processed matrice {matriceNumber}");
+            Interlocked.Increment(ref matriceNumber);
+
+            return matrix;
+        }
+        public static double[,] InitializeMatrix(int rows, int columns)
+        {
             double[,] matrix = new double[rows, columns];
 
             //for (int i = 0; i < rows; i++)
@@ -46,10 +69,6 @@ namespace Parallelism.Data
                 }
             });
             
-            
-            Console.WriteLine($"processed matrice {matriceNumber}");
-            Interlocked.Increment(ref matriceNumber);
-
             return matrix;
         }
 
