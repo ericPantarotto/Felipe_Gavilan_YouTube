@@ -52,7 +52,7 @@
         await InvokeAsync(() => StateHasChanged());
         await Task.Delay(300);
 
-        int nbCards = 1000   ;
+        int nbCards = 1_000_000   ;
         Stopwatch stopwatch = new();
         stopwatch.Start();
         cts = new();
@@ -190,7 +190,7 @@
         return tasks;
     }
 
-    private async Task<ConcurrentBag<Card>> ProcessCardsParallel(int nbCards, 
+    @* private async Task<ConcurrentBag<Card>> ProcessCardsParallel(int nbCards, 
         CancellationToken token = default,
         int maxDegreeOfParallelism = -1){
         
@@ -209,7 +209,7 @@
         //await Task.WhenAll(bagAddTasks);
         Task.WaitAll(bagAddTasks.ToArray());
         return cb;
-    }
+    } *@
 
     private async Task<ConcurrentBag<Card>> ProcessCardsParallelForEach(int nbCards, 
         CancellationToken token = default,
@@ -227,7 +227,12 @@
                 MaxDegreeOfParallelism = maxDegreeOfParallelism
             },
             async (cardsArray, _)  =>{
-                await Task.Run(() => bagAddTasks.Add(Task.Run(() => cb.Add(CreateCard())) ) );
+                try{
+                    await Task.Run(() => bagAddTasks.Add(Task.Run(() => cb.Add(CreateCard())) ) );    
+                }
+                catch(OperationCanceledException){
+                    throw;
+                }
                 //await Task.Run(async () => cb.Add(await CreateCard())) ;
             });
         
@@ -252,6 +257,7 @@
         
         var tasks = Enumerable.Range(1,nbCards).AsParallel()
             .WithDegreeOfParallelism(2)
+            .WithCancellation(cts.Token)
             .Select(x =>
             {
                 try{
@@ -261,7 +267,6 @@
                 catch(OperationCanceledException){
                     throw;
                 }
-
             }).ToList();
 
         await Task.WhenAll(tasks);
