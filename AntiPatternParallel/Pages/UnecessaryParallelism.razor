@@ -1,0 +1,81 @@
+﻿@using System.IO
+@using System.Drawing
+@using System.Diagnostics;
+
+@page "/UnecessaryParallelism"
+
+<PageTitle>UnecessaryParallelism</PageTitle>
+
+<h1>UnecessaryParallelism</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+
+<div class="input-group">
+    <textarea class="form-control" aria-label="With textarea">@text</textarea>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private string text  = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        httpClient = new();
+
+    }
+    
+    private async void HandleValid(){
+        imageHidden = false;
+        text  = "";
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+
+        text += "Begin Sequential\r\n";
+
+        int max = int.MaxValue / 10;
+        IEnumerable<int> numbers = Enumerable.Range(0, max);
+
+        stopwatch.Start();
+
+        await Task.Run(() =>
+        {
+            foreach (var number in numbers)
+            {
+                var result = number + number;
+            }
+        });
+
+        text += $"Sequential - duration in seconds: {stopwatch.ElapsedMilliseconds/ 1000.0}\r\n";
+
+        stopwatch.Restart();
+
+        await Task.Run(() =>
+        {
+            Parallel.ForEach(numbers, number => { var result = number + number; });
+        });
+
+        double timeParallel = stopwatch.ElapsedMilliseconds/ 1000.0;
+        text += $"Parallel - duration in seconds: {timeParallel}\r\n";
+
+        text +="End";
+        imageHidden = true;
+
+        await InvokeAsync(() => StateHasChanged());
+        
+    }
+}
+
+
+<style>
+.input-group{
+    height:700px;
+    margin: .4rem 0;
+    }
+</style>
