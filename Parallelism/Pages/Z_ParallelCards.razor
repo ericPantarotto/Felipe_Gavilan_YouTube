@@ -3,6 +3,8 @@
 @using System.Text.RegularExpressions;
 @using System.Diagnostics;
 @using Parallelism.Data;
+@using System.Collections.Concurrent;
+
 @page "/ParallelCards"
 
 <PageTitle>ParallelCards</PageTitle>
@@ -10,7 +12,7 @@
 <h1>ParallelCards</h1>
 
 <button class="btn btn-primary" @onclick="HandleValid">Click me</button>
-@* /<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button> *@
+/<button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
 
 <div class="container">
     <div class="row">
@@ -19,7 +21,7 @@
                 <textarea class="form-control" aria-label="With textarea">@text</textarea>
             </div>
         </div>
-    
+
         <div class="col-md-6">
             <div class="row">
                 <div class="col-md-6">
@@ -33,80 +35,153 @@
 @code {
     private bool imageHidden = true;
     private string text = "";
-    private HttpClient? httpClient;
+    //private HttpClient? httpClient;
+    private int SemaphoreSize = Int32.MaxValue; //2;
+    private CancellationTokenSource cts = new();
 
     protected override void OnParametersSet(){
         base.OnParametersSet();
-        httpClient = new();
+        //httpClient = new();
     }
 
     private async Task HandleValid()
     {
         imageHidden = false;
         text = "";
-        text += "Begin \r\n";
         await InvokeAsync(() => StateHasChanged());
         await Task.Delay(300);
 
-        int nbCards = 100   ;
+        int nbCards = 1000   ;
         Stopwatch stopwatch = new();
         stopwatch.Start();
+        cts = new();
 
-        @* List<Task<Card>> tasks = Enumerable.Range(1,nbCards).Select(async x => 
-        {
-            return await CreateCard();
-        }).ToList();
-        
-        await Task.WhenAll(tasks); *@
+        //List<Task<Card>> tasks = Enumerable.Range(1,nbCards).Select(async x =>
+        //{
+        //    return await CreateCard();
+        //}).ToList();
+        //await Task.WhenAll(tasks);
+        //foreach (var item in tasks)
+        //{
+        //    Console.WriteLine(item.Result.CardName) ;
+        //}
 
-        @* foreach (var item in tasks)
-        {
-            Console.WriteLine(item.Result.CardName) ;
-        } *@
-
-        //TODO: implement semaphore + cancellation token 
         try{
-            var result = await ProcessCards(nbCards);
+            //Select
+            text += "Begin Select\r\n";
+            List<Task<Card>> tasks = await ProcessCardsSelect(nbCards, cts.Token);
             
-            double sequentialTime = stopwatch.ElapsedMilliseconds / 1000.0;
-            text += $"Sequential - duration in seconds: {sequentialTime}\r\n";
+            double selectTime = stopwatch.ElapsedMilliseconds / 1000.0;
+            text += $"Simultaneous Task (Select) - duration in seconds: {selectTime}\r\n";
+            
+            //foreach (var item in tasks){
+                //item.Result.ThreadId = item.Id;
+                //Console.WriteLine($"{item.Result.CardName}/{item.Result.ThreadId}") ;
+            //}
+            text += $"{tasks.Count} cards have been created\r\n";
+            
+            
+            //Parallel-For
+            text += "Begin Select\r\n";
             await InvokeAsync(() => StateHasChanged());
-                
-            foreach (var item in result){
-                item.Result.ThreadId = item.Id;
-                Console.WriteLine($"{item.Result.CardName}/{item.Result.ThreadId}") ;
-            }
-        }
-        catch (Exception){
-            throw;
-        }
+
+            stopwatch.Restart();
+            ConcurrentBag<Card> bag = await ProcessCardsParallel(nbCards, cts.Token);
+            
+
+            double parallelForTime = stopwatch.ElapsedMilliseconds / 1000.0;
+            text += $"ParallelFor Task - duration in seconds: {parallelForTime}\r\n";
+            await InvokeAsync(() => StateHasChanged());
+            
+            int itemsInBag = 0;
+            while (!bag.IsEmpty){
+                if (bag.TryTake(out Card? citem)){
+                    //Console.WriteLine(citem.CardName);
+                    itemsInBag++;
+                }
+            };
         
-        text +="\r\nEnd\r\n";
-        imageHidden = true;
+            text += $"{itemsInBag} cards have been created";
+        }
+        catch(OperationCanceledException){
+             text += "Operation was cancelled\r\n";
+        }
+        catch (Exception ex){
+            text = ex.Message;
+
+        }
+        finally{
+            text +="\r\nEnd\r\n";
+            imageHidden = true;
+            cts.Dispose();
+        }
 
     }
 
-    private async Task<List<Task<Card>>> ProcessCards(int nbCards){
-        var tasks = Enumerable.Range(1,nbCards).Select(async x => 
+    private async Task<List<Task<Card>>> ProcessCardsSelect(int nbCards, CancellationToken token = default){
+        using var semaphore = new SemaphoreSlim(SemaphoreSize);
+
+        var tasks = Enumerable.Range(1,nbCards).Select(async x =>
         {
-            return await CreateCard();
+            await semaphore.WaitAsync();
+            try{
+                return await CreateCard();
+            }
+            catch(OperationCanceledException){
+                throw;
+            }
+            finally{
+                semaphore.Release();
+            }
+
         }).ToList();
-        
+
         await Task.WhenAll(tasks);
-        
+
         return tasks;
     }
 
+    private async Task<ConcurrentBag<Card>> ProcessCardsParallel(int nbCards, 
+        CancellationToken token = default,
+        int maxDegreeOfParallelism = -1){
+        
+        ConcurrentBag<Card> cb = new();
+        List<Task> bagAddTasks = new();
+        //List<Card> tasks = new();
+        //await Task.Run(() =>
+        //{
+            Parallel.For(1,nbCards+1,
+                        new ParallelOptions{
+                            CancellationToken = token,
+                            MaxDegreeOfParallelism = maxDegreeOfParallelism
+                        },
+                        p =>{
+                            //tasks.Add(await CreateCard()) ;
+                            bagAddTasks.Add(Task.Run(async () =>cb.Add(await CreateCard())) ?? Task.CompletedTask) ;
+                        });
+        //});
+        await Task.WhenAll(bagAddTasks);
+        //Task.WaitAll(bagAddTasks.ToArray());
+        return cb;
+    }
+
     private async Task<Card> CreateCard(){
-        await Task.Delay(2000);
+        if (cts.Token.IsCancellationRequested ){
+                    cts.Token.ThrowIfCancellationRequested();
+                }
+        //await Task.Delay(2000);
 
         double randomValue = RandomNumberGenNew.NextDouble();
-        string valueString = (randomValue * 100000000).ToString(); 
+        string valueString = (randomValue * 100000000).ToString();
         string cardName = String.Join("_",Regex.Matches(valueString, @"\d{4}").Cast<Match>());
-        
+        //Console.WriteLine(cardName);
         return new Card(){
             CardName = cardName
         };
+    }
+    private void HandleCancel()
+    {
+        cts.Cancel();
     }
 }
 
