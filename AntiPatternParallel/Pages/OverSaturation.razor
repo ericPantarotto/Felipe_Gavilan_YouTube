@@ -1,0 +1,69 @@
+﻿@using Parallelism.Data;
+@using System.Diagnostics;
+
+@page "/OverSaturation"
+
+<PageTitle>OverSaturation</PageTitle>
+
+<h1>OverSaturation</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+
+<div class="input-group">
+    <textarea class="form-control" aria-label="With textarea">@text</textarea>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private string text  = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        httpClient = new();
+
+    }
+    
+    private async void HandleValid(){
+        imageHidden = false;
+        text  = "";
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+        text += "Begin\r\n";
+        await Task.Delay(300);
+        await InvokeAsync(() => StateHasChanged());
+        
+        var matrices = Enumerable.Range(1, 20).Select(x => Matrices.InitializeMatrix(750, 750)).ToList();
+
+        var parallelTime = stopwatch.ElapsedMilliseconds / 1000.0;
+        text += $"Paralellism - took {parallelTime} seconds\r\n";
+
+        stopwatch.Restart();
+        var matrices2 = Enumerable.Range(1, 20).Select(x => Matrices.InitializeMatrixSaturated(750, 750)).ToList();
+
+        var overSaturationTime = stopwatch.ElapsedMilliseconds / 1000.0;
+
+        text += $"Over Saturation - took {overSaturationTime} seconds\n";
+        //Utils.WriteComparison(parallelTime, overSaturationTime);
+
+        text +="End";
+        imageHidden = true;
+
+        await InvokeAsync(() => StateHasChanged());
+        
+    }
+}
+
+
+<style>
+.input-group{
+    height:180px;
+    margin: .4rem 0;
+    }
+</style>
