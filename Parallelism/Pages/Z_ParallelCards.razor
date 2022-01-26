@@ -4,6 +4,7 @@
 @using System.Diagnostics;
 @using Parallelism.Data;
 @using System.Collections.Concurrent;
+@using System.Linq;
 
 @page "/ParallelCards"
 
@@ -74,45 +75,90 @@
             double selectTime = stopwatch.ElapsedMilliseconds / 1000.0;
             text += $"Simultaneous Task (Select) - duration in seconds: {selectTime}\r\n";
             
-            Console.WriteLine("------------ -------------\r\nSimultaneous Select Cards\r\n------------ -------------");
+            text += $"{tasks.Count} cards have been created\r\n";
+            text += "------------ -------------\r\n";
+            @* Console.WriteLine("------------ -------------\r\nSimultaneous Select Cards\r\n------------ -------------");
             foreach (var item in tasks){
               Console.WriteLine($"{item.Result.CardName}/{item.Result.ThreadId}") ;
-            }
-            text += $"{tasks.Count} cards have been created\r\n";
-            
-            
-            //Parallel-For
-            text += "Begin Select\r\n";
+            } *@
+
+
+            //Parallel-ForEachAsync
+            text += "Begin ParallelForEachAsync\r\n";
             await InvokeAsync(() => StateHasChanged());
 
             stopwatch.Restart();
-            ConcurrentBag<Card> bag = await ProcessCardsParallel(nbCards, cts.Token);
+            ConcurrentBag<Card> bagForEachAsync = await ProcessCardsParallelForEach(nbCards, cts.Token);
+            
+
+            double parallelForEachAsyncTime = stopwatch.ElapsedMilliseconds / 1000.0;
+            text += $"ParallelForEachAsync Task - duration in seconds: {parallelForEachAsyncTime}\r\n";
+            await InvokeAsync(() => StateHasChanged());
+            
+            //Console.WriteLine("------------ -------------\r\nParallelForEachAsync Cards\r\n------------ -------------");
+            int itemsInBagParallelForEachAsync = 0;
+            while (!bagForEachAsync.IsEmpty){
+                if (bagForEachAsync.TryTake(out Card? citem)){
+                    //Console.WriteLine($"{citem.CardName}/{citem.ThreadId}");
+                    itemsInBagParallelForEachAsync++;
+                }
+            };
+
+            text += $"{itemsInBagParallelForEachAsync} cards have been created\r\n";
+            text += "------------ -------------\r\n";
+            
+            //Parallel-For
+            @* text += "Begin ParallelFor\r\n";
+            await InvokeAsync(() => StateHasChanged());
+
+            stopwatch.Restart();
+            ConcurrentBag<Card> bagParallelFor = await ProcessCardsParallel(nbCards, cts.Token);
             
 
             double parallelForTime = stopwatch.ElapsedMilliseconds / 1000.0;
             text += $"ParallelFor Task - duration in seconds: {parallelForTime}\r\n";
             await InvokeAsync(() => StateHasChanged());
             
-            Console.WriteLine("------------ -------------\r\nParallel Cards\r\n------------ -------------");
-            int itemsInBag = 0;
-            while (!bag.IsEmpty){
-                if (bag.TryTake(out Card? citem)){
-                    Console.WriteLine($"{citem.CardName}/{citem.ThreadId}");
-                    itemsInBag++;
+            //Console.WriteLine("------------ -------------\r\nParallel Cards\r\n------------ -------------");
+            int itemsInBagParallelFor = 0;
+            while (!bagParallelFor.IsEmpty){
+                if (bagParallelFor.TryTake(out Card? citem)){
+                    //Console.WriteLine($"{citem.CardName}/{citem.ThreadId}");
+                    itemsInBagParallelFor++;
                 }
             };
-        
-            text += $"{itemsInBag} cards have been created";
+
+            text += $"{itemsInBagParallelFor} cards have been created\r\n";
+            text += "------------ -------------\r\n"; *@
+
+            //PLINQ
+            text += "Begin PLINQ\r\n";
+            await InvokeAsync(() => StateHasChanged());
+
+            stopwatch.Restart();
+            List<Task<Card>> tasksPlinq = await ProcessCardsPLinq(nbCards, cts.Token);
+
+            double parallelPlinqTime = stopwatch.ElapsedMilliseconds / 1000.0;
+            text += $"ParallelFor Task - duration in seconds: {parallelPlinqTime}\r\n";
+            await InvokeAsync(() => StateHasChanged());
+            text += $"{tasksPlinq.Count} cards have been created";
+            
+            //Console.WriteLine("------------ -------------\r\nPLinq Cards\r\n------------ -------------");
+            //foreach (var item in tasksPlinq){
+            //  Console.WriteLine($"{item.Result.CardName}/{item.Result.ThreadId}") ;
+            //}
         }
         catch(OperationCanceledException){
              text += "Operation was cancelled\r\n";
         }
         catch (Exception ex){
             text = ex.Message;
+            Console.WriteLine(ex.Message);
 
         }
         finally{
-            text +="\r\nEnd\r\n";
+            text += "\r\n------------ -------------\r\n";
+            text +="End\r\n";
             imageHidden = true;
             cts.Dispose();
         }
@@ -128,7 +174,7 @@
         {
             await semaphore.WaitAsync();
             try{
-                return await CreateCard();
+                return CreateCard();
             }
             catch(OperationCanceledException){
                 throw;
@@ -157,7 +203,7 @@
                 MaxDegreeOfParallelism = maxDegreeOfParallelism
             },
             async p =>{
-                await Task.Run(() => bagAddTasks.Add(Task.Run(async () =>cb.Add(await CreateCard())) ) );
+                await Task.Run(() => bagAddTasks.Add(Task.Run(() =>cb.Add(CreateCard())) ) );
             });
         
         //await Task.WhenAll(bagAddTasks);
@@ -165,11 +211,71 @@
         return cb;
     }
 
-    private async Task<Card> CreateCard(){
+    private async Task<ConcurrentBag<Card>> ProcessCardsParallelForEach(int nbCards, 
+        CancellationToken token = default,
+        int maxDegreeOfParallelism = -1){
+        
+        ConcurrentBag<Card> cb = new();
+        List<Task> bagAddTasks = new();
+        
+
+        var cardsArray = Enumerable.Range(1, nbCards);
+
+        await Parallel.ForEachAsync(cardsArray,
+            new ParallelOptions{
+                CancellationToken = token,
+                MaxDegreeOfParallelism = maxDegreeOfParallelism
+            },
+            async (cardsArray, _)  =>{
+                await Task.Run(() => bagAddTasks.Add(Task.Run(() => cb.Add(CreateCard())) ) );
+                //await Task.Run(async () => cb.Add(await CreateCard())) ;
+            });
+        
+        //HACK:
+        Task[] tasksArray = bagAddTasks.Where(t => t != null).ToArray();
+        if (tasksArray.Length > 0){
+            Task.WaitAll(tasksArray);   
+            await Task.WhenAll(tasksArray);
+        } 
+
+        //await Task.WhenAll(bagAddTasks);
+        //Task.WaitAll(bagAddTasks.ToArray());
+        return cb;
+    }
+ 
+    private async Task<List<Task<Card>>> ProcessCardsPLinq(int nbCards, 
+        CancellationToken token = default,
+        int maxDegreeOfParallelism = -1){
+        
+        ConcurrentBag<Card> cb = new();
+        List<Task> bagAddTasks = new();
+        
+        var tasks = Enumerable.Range(1,nbCards).AsParallel()
+            .WithDegreeOfParallelism(2)
+            .Select(x =>
+            {
+                try{
+                    //return await CreateCard();
+                    return Task.Run(() => CreateCard());
+                }
+                catch(OperationCanceledException){
+                    throw;
+                }
+
+            }).ToList();
+
+        await Task.WhenAll(tasks);
+
+        return tasks;
+
+        
+    } 
+
+    private Card CreateCard(){
         if (cts.Token.IsCancellationRequested ){
                     cts.Token.ThrowIfCancellationRequested();
                 }
-        await Task.Delay(10);
+        //await Task.Delay(10);
 
         double randomValue = RandomNumberGenNew.NextDouble();
         string valueString = (randomValue * 100000000).ToString();
