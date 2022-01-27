@@ -1,0 +1,108 @@
+﻿@using System.Collections.Concurrent;
+@using System.Diagnostics;
+
+@page "/ThreadSafety"
+
+<PageTitle>ThreadSafety</PageTitle>
+
+<h1>ThreadSafety</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+    
+        <div class="col-md-6">
+            
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@textSafe</textarea>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private string text  = "";
+    private string textSafe = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        httpClient = new();
+
+    }
+    
+    private async void HandleValid(){
+        imageHidden = false;
+        text  = "";
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+        text += "Begin Non Thread Safety\r\n";
+        await Task.Delay(300);
+        await InvokeAsync(() => StateHasChanged());
+        
+        Random random = new();
+
+        ConcurrentDictionary<double, int> concurrentDictionary = new();
+
+
+        Parallel.For(1, 1_000_000, i =>
+        {
+            double key = random.NextDouble();
+            concurrentDictionary.AddOrUpdate(key, 1, (key, currentValue) => currentValue + 1);
+        });
+        List<KeyValuePair<double,int>> moreFrequents = concurrentDictionary.OrderByDescending(x => x.Value).Take(10).ToList();
+
+        foreach (var item in moreFrequents)
+        {
+            text += $"The key {item.Key} is repeated {item.Value} times\r\n";
+        }
+
+        text +="End";
+
+        textSafe += "Begin Thread Safety\r\n";
+        ConcurrentDictionary<double, int> concurrentDictionarySafe = new();
+        Object mutex = new();
+
+        Parallel.For(1, 1_000_000, i =>
+        {
+            double key ;
+            lock (mutex){
+                key = random.NextDouble();
+            }
+            concurrentDictionarySafe.AddOrUpdate(key, 1, (key, currentValue) => currentValue + 1);
+        });
+        lock(typeof(int)){}
+        concurrentDictionarySafe.OrderByDescending(x => x.Value)
+            .Take(10)
+            .ToList()
+            .ForEach(item => textSafe += $"The key {item.Key} is repeated {item.Value} times\r\n");
+            ;
+        textSafe +="End";
+
+        imageHidden = true;
+        await InvokeAsync(() => StateHasChanged());
+        
+    }
+}
+
+
+<style>
+.input-group{
+    height:300px;
+    margin: .4rem 0;
+    }
+</style>
