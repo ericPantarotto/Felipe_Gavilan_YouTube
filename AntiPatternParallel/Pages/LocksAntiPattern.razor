@@ -1,0 +1,135 @@
+﻿@using System.Collections.Concurrent;
+@using System.Diagnostics;
+
+@page "/LocksAntiPattern"
+
+<PageTitle>LocksAntiPattern</PageTitle>
+
+<h1>LocksAntiPattern</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+    
+       
+    </div>
+
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+    </div>
+</div>
+
+@code {
+    private bool imageHidden = true;
+    private string text  = "";
+    private HttpClient? httpClient;
+
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        httpClient = new();
+
+    }
+    
+    private async void HandleValid(){
+        imageHidden = false;
+        text  = "";
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+        text += "Begin\r\n";
+        await Task.Delay(300);
+        await InvokeAsync(() => StateHasChanged());
+        
+        //FIXME: locks should always have their own object 
+@* 
+            var mutexA = new object();
+            var mutexB = new object();
+
+            var task1 = Task.Run(() =>
+            {
+                Parallel.For(1, 100000, i =>
+                {
+                    lock (mutexA)
+                    {
+                        lock (mutexB)
+                        {
+                            var value = i;
+                        }
+                    }
+                });
+            });
+
+            var task2 = Task.Run(() =>
+            {
+                Parallel.For(1, 100000, i =>
+                {
+                    lock (mutexB)
+                    {
+                        lock (mutexA)
+                        {
+                            var value = i;
+                        }
+                    }
+                });
+            });
+
+        await Task.WhenAll(task1, task2); *@
+
+        //HACK:
+        var mutexA = new object();
+        var mutexB = new object();
+        var mutexC = new object();
+        var mutexD = new object();
+
+        var task1 = Task.Run(() =>
+        {
+            Parallel.For(1, 100000, i =>
+            {
+                lock (mutexA)
+                {
+                    lock (mutexB)
+                    {
+                        var value = i;
+                    }
+                }
+            });
+        });
+
+        var task2 = Task.Run(() =>
+        {
+            Parallel.For(1, 100000, i =>
+            {
+                lock (mutexC)
+                {
+                    lock (mutexD)
+                    {
+                        var value = i;
+                    }
+                }
+            });
+        });
+
+        await Task.WhenAll(task1, task2);
+
+        text +="End";
+
+        imageHidden = true;
+        await InvokeAsync(() => StateHasChanged());
+        
+    }
+}
+
+
+<style>
+.input-group{
+    height:300px;
+    margin: .4rem 0;
+    }
+</style>
