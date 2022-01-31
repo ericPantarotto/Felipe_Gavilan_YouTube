@@ -1,0 +1,170 @@
+﻿
+@page "/DevToXiao"
+@using System.Diagnostics
+@using System.Net
+@using System.Net.Http.Headers
+@using System.Collections.Concurrent
+
+<PageTitle>Dev.to</PageTitle>
+
+<h1>Dev.to</h1>
+
+<button class="btn btn-primary" @onclick="HandleValid">Click me</button>
+@* <button class="btn btn-secondary" @onclick="HandleCancel">Cancel</button> *@
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <textarea class="form-control" aria-label="With textarea">@text</textarea>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-6">
+                    <img src="spinning-loading.gif" alt="Image" hidden="@imageHidden">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+ private bool imageHidden = true;
+    private static string text = "";
+    //private HttpClient? httpClient;
+    private int SemaphoreSize = Int32.MaxValue; //2;
+    private CancellationTokenSource cts = new();
+    
+    private int nbCardsToProcess;
+    protected override void OnParametersSet(){
+        base.OnParametersSet();
+        //httpClient = new();
+    }
+
+    private async Task HandleValid()
+    {
+        text = "";
+          // Requested URLs
+        var urls = new Uri[] { new Uri("https://dev.to/garryxiao/react-typescript-electron-all-steps-to-start-lcc"), 
+            new Uri("https://dev.to/bipinrajbhar/the-beginner-s-guide-to-react-introduction-50i0"),
+            new Uri("https://stackoverflow.com/questions/22024233/read-response-header-from-webclient-in-c-sharp") 
+            };
+
+        // Cancellation token source
+        using (var cts = new CancellationTokenSource())
+        {
+            // WaitAll way
+            try{
+                text += "Starting Select / WhenAll";
+                await InvokeAsync(() => StateHasChanged());
+
+                var contentLengthWaitAll = await FetchContentLengthWaitAllAsync(urls, cts.Token);
+                foreach (var item in contentLengthWaitAll){
+                    Console.WriteLine($"{item.Key}: {item.Value}");
+                    text += $"{item.Key}: {item.Value}\r\n";
+                }
+                
+                text += "\r\nStarting Parallel\r\n";
+                await InvokeAsync(() => StateHasChanged());
+
+                var contentLengthParallel = await FetchContentLengthParallel(urls, cts.Token);
+                foreach (var item in contentLengthWaitAll){
+                    Console.WriteLine($"{item.Key}: {item.Value}");
+                    text += $"{item.Key}: {item.Value}\r\n";
+                }
+                
+            }
+            catch (System.Exception ex){
+                Console.WriteLine(ex.Message);
+            }
+                
+            }
+    }
+
+    static async Task<ConcurrentDictionary<string, int>> FetchContentLengthWaitAllAsync(Uri[] urls, CancellationToken cancellationToken){
+        // Start a Stopwatch to evaluate performance
+        var sw = new Stopwatch();
+        sw.Start();
+
+        // Current thread id
+        Console.WriteLine("Current Thread Id: " + Thread.CurrentThread.ManagedThreadId);
+
+        ConcurrentDictionary<string, int> bag = new ();
+        // Request
+        await Task.WhenAll(urls.Select(async url =>
+        {
+            
+            using HttpClient client = new(){
+                BaseAddress = new Uri(url.ToString()),
+            };
+            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("DotNet", "6"));
+            
+            try{
+                byte[] resultByte = await client.GetByteArrayAsync(url.ToString());
+                bag.TryAdd(url.ToString(),  resultByte.Length) ;
+            }
+            catch (Exception){
+                throw;
+            }
+        }));
+        
+        // Output
+        sw.Stop();
+        
+        text += $"\r\nDuration Miliseconds: {sw.ElapsedMilliseconds}\r\n";
+        Console.WriteLine("FetchContentLengthDirectAsync Miliseconds: " + sw.ElapsedMilliseconds);
+
+        return bag;
+    }
+
+    static async Task<ConcurrentDictionary<string, int>> FetchContentLengthParallel(Uri[] urls, CancellationToken cancellationToken){
+        // Start a Stopwatch to evaluate performance
+        var sw = new Stopwatch();
+        sw.Start();
+
+        // Request
+        ConcurrentDictionary<string, int> bag = new ();
+        await Task.Run(() =>
+        {
+            ConcurrentDictionary<string, int> bag = new ();
+
+            Parallel.ForEach(urls, async (url) =>
+            {
+                // Web client for the request
+                using HttpClient client = new(){
+                    BaseAddress = new Uri(url.ToString()),
+                };
+                client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("DotNet", "6"));
+                
+                try{
+                    byte[] resultByte = await client.GetByteArrayAsync(url.ToString());
+                    bag.TryAdd(url.ToString(),  resultByte.Length) ;
+                }
+                catch (Exception){
+                    throw;
+                }
+            });
+        });
+
+        // Output
+        sw.Stop();
+        text += $"Duration Miliseconds: {sw.ElapsedMilliseconds}\r\n";
+        Console.WriteLine("FetchContentLengthAsync Miliseconds: " + sw.ElapsedMilliseconds);
+
+        return bag;
+    }
+    
+
+}
+
+
+<style>
+    .input-group {
+        height: 700px;
+        margin: .4rem 0;
+    }
+</style>
+
+                             
